@@ -1,0 +1,134 @@
+/*
+ * BitSentry Shared Color Palette
+ *
+ * Single source of truth for colors across all apps.
+ * Frontend and Desktop import this directly.
+ * Marketing copies the values (different build pipeline).
+ *
+ * Convention: HSL values without hsl() wrapper, used as hsl(var(--name)).
+ * Semantic colors use the same names across light/dark for easy theming.
+ */
+
+:root {
+  /* --- Surface --- */
+  --background: 0 0% 100%;
+  --foreground: 0 0% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
+  --card-secondary: 0 0% 98%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 9%;
+
+  /* --- Primary (neutral — buttons, links, emphasis) --- */
+  --primary: 0 0% 9%;
+  --primary-foreground: 0 0% 100%;
+
+  /* --- Secondary / Muted / Accent --- */
+  --secondary: 0 0% 96%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 45%;
+  --accent: 0 0% 96%;
+  --accent-foreground: 0 0% 9%;
+
+  /* --- Borders & Inputs --- */
+  --border: 0 0% 90%;
+  --border-hover: 0 0% 78%;
+  --input: 0 0% 90%;
+  --ring: 0 0% 60%;
+
+  /* --- Status --- */
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 142 76% 36%;
+  --warning: 38 92% 50%;
+  --info: 217 91% 60%;
+
+  /* --- Scrollbar --- */
+  --scrollbar-track: 0 0% 98%;
+  --scrollbar-thumb: 0 0% 82%;
+  --scrollbar-thumb-hover: 0 0% 70%;
+
+  /* --- Brand accent (used sparingly — focus rings, highlights) --- */
+  --brand: 190 100% 50%;
+  --brand-foreground: 0 0% 100%;
+  --brand-emphasis: 192 100% 42%;
+  --brand-emphasis-surface: 192 100% 95%;
+  --brand-emphasis-border: 192 95% 82%;
+  --brand-emphasis-subtle: 192 72% 34%;
+
+  /* --- Radius --- */
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* --- Surface --- */
+  --background: 0 0% 7%;
+  --foreground: 0 0% 93%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 93%;
+  --card-secondary: 0 0% 13%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 0 0% 93%;
+
+  /* --- Primary (inverted for dark) --- */
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 9%;
+
+  /* --- Secondary / Muted / Accent --- */
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 93%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 63%;
+  --accent: 0 0% 15%;
+  --accent-foreground: 0 0% 93%;
+
+  /* --- Borders & Inputs --- */
+  --border: 0 0% 20%;
+  --border-hover: 0 0% 28%;
+  --input: 0 0% 15%;
+  --ring: 0 0% 40%;
+
+  /* --- Status --- */
+  --destructive: 0 63% 50%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 142 70% 45%;
+  --warning: 38 85% 55%;
+  --info: 213 94% 68%;
+
+  /* --- Scrollbar --- */
+  --scrollbar-track: 0 0% 10%;
+  --scrollbar-thumb: 0 0% 24%;
+  --scrollbar-thumb-hover: 0 0% 34%;
+
+  /* --- Brand accent (same in dark) --- */
+  --brand: 190 100% 50%;
+  --brand-foreground: 0 0% 100%;
+  --brand-emphasis: 190 100% 58%;
+  --brand-emphasis-surface: 190 100% 11%;
+  --brand-emphasis-border: 190 100% 24%;
+  --brand-emphasis-subtle: 190 90% 70%;
+}
+
+.bs-brand-tint {
+  border-color: hsl(var(--brand-emphasis-border));
+  background: hsl(var(--brand-emphasis-surface));
+  color: hsl(var(--brand-emphasis));
+}
+
+.bs-brand-tint:hover {
+  filter: brightness(0.98);
+}
+
+.bs-brand-tint-icon {
+  background: hsl(var(--brand-emphasis) / 0.14);
+  color: hsl(var(--brand-emphasis));
+}
+
+.bs-brand-tint-title {
+  color: hsl(var(--brand-emphasis));
+}
+
+.bs-brand-tint-subtitle {
+  color: hsl(var(--brand-emphasis-subtle));
+}

@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "rootDir": "../..",
+    "outDir": "./out",
+    "types": ["node"],
+    "paths": {
+      "@bitsentry-ce/desktop-cli": ["../../packages/desktop-cli/src/index.ts"],
+      "@bitsentry-ce/desktop-cli/*": ["../../packages/desktop-cli/src/*"],
+      "@bitsentry-ce/coding-agents": ["../../packages/coding-agents/src/index.ts"],
+      "@bitsentry-ce/coding-agents/*": ["../../packages/coding-agents/src/*"],
+      "@bitsentry-ce/components": ["../../packages/components/src/index.ts"],
+      "@bitsentry-ce/components/*": ["../../packages/components/src/*"],
+      "@bitsentry-ce/core": ["../../packages/core/src/index.ts"],
+      "@bitsentry-ce/core/*": ["../../packages/core/src/*"],
+      "@bitsentry-ce/i18n": ["../../packages/i18n/src/index.ts"],
+      "@bitsentry-ce/i18n/*": ["../../packages/i18n/src/*"],
+      "electron-trpc/main": [
+        "../../packages/electron-trpc/packages/electron-trpc/src/main/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "electron.vite.config.ts",
+    "tailwind.config.ts",
+    "vite.cli.config.ts",
+    "vitest.config.ts"
+  ]
+}

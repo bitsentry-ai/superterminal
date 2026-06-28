@@ -1,0 +1,23 @@
+{
+  "common.dashboardShell.dashboardMetrics": "navigation.dashboardShell.dashboardMetrics",
+  "common.dashboardShell.dashboardSections": "navigation.dashboardShell.dashboardSections",
+  "common.dashboardShell.securityOperationsConsole": "navigation.dashboardShell.securityOperationsConsole",
+  "common.navbar.bitsentry": "navigation.navbar.bitsentry",
+  "common.navbar.logOut": "navigation.navbar.logOut",
+  "common.navbar.more": "navigation.navbar.more",
+  "common.navbar.more_2": "navigation.navbar.more",
+  "common.navbar.more_3": "navigation.navbar.more",
+  "common.navbar.more_4": "navigation.navbar.more",
+  "common.navbar.more_5": "navigation.navbar.more",
+  "common.navbar.created": "navigation.navbar.createdCount",
+  "common.navbar.pending": "navigation.navbar.pendingCount",
+  "common.navbar.noCreatedTickets": "navigation.navbar.noCreatedTickets",
+  "common.navbar.noDiagnosesYet": "navigation.navbar.noDiagnosesYet",
+  "common.navbar.noIncidentsYet": "navigation.navbar.noIncidentsYet",
+  "common.navbar.noPendingTickets": "navigation.navbar.noPendingTickets",
+  "common.navbar.noResolutionsYet": "navigation.navbar.noResolutionsYet",
+  "common.navbar.noResultsYet": "navigation.navbar.noResultsYet",
+  "common.navbar.noRunbooksYet": "navigation.navbar.noRunbooksYet",
+  "common.topBar.connected": "navigation.topBar.connected",
+  "common.topBar.offline": "navigation.topBar.offline"
+}

@@ -1,0 +1,1610 @@
+{
+  "providers": [
+    {
+      "providerKey": "openai",
+      "displayName": "OpenAI",
+      "providerType": "api",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "gpt-5.5",
+          "displayName": "GPT-5.5",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.4-mini",
+          "displayName": "GPT-5.4 Mini",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.4-nano",
+          "displayName": "GPT-5.4 Nano",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.2",
+          "displayName": "GPT-5.2",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "none",
+                  "label": "None"
+                },
+                {
+                  "value": "minimal",
+                  "label": "Minimal"
+                },
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "xhigh",
+                  "label": "Extra High",
+                  "shortLabel": "xHigh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-5",
+          "displayName": "GPT-5",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-5-mini",
+          "displayName": "GPT-5 Mini",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-5-nano",
+          "displayName": "GPT-5 Nano",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-4.1",
+          "displayName": "GPT-4.1",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "gpt-4.1-mini",
+          "displayName": "GPT-4.1 Mini",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "gpt-4.1-nano",
+          "displayName": "GPT-4.1 Nano",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "gpt-4o",
+          "displayName": "GPT-4o",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "gpt-4o-mini",
+          "displayName": "GPT-4o Mini",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "o3",
+          "displayName": "o3",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "always_on",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "o4-mini",
+          "displayName": "o4-mini",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "always_on",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "gpt-oss-120b",
+          "displayName": "GPT-OSS 120B",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "gpt-oss-20b",
+          "displayName": "GPT-OSS 20B",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        }
+      ]
+    },
+    {
+      "providerKey": "anthropic",
+      "displayName": "Anthropic",
+      "providerType": "api",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "claude-opus-4-7",
+          "displayName": "Claude Opus 4.7",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Effort",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-opus-4-6",
+          "displayName": "Claude Opus 4.6",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Effort",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "displayName": "Claude Sonnet 4.6",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Effort",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-haiku-4-5",
+          "displayName": "Claude Haiku 4.5",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "claude-opus-4-5",
+          "displayName": "Claude Opus 4.5",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Effort",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-sonnet-4-5",
+          "displayName": "Claude Sonnet 4.5",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Effort",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-opus-4-1",
+          "displayName": "Claude Opus 4.1",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Effort",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "providerKey": "gemini",
+      "displayName": "Gemini",
+      "providerType": "api",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "gemini-2.5-pro",
+          "displayName": "Gemini 2.5 Pro",
+          "supportsImageInput": true,
+          "supportsAudioInput": true,
+          "supportsVideoInput": true,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "always_on",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "displayName": "Gemini 2.5 Flash",
+          "supportsImageInput": true,
+          "supportsAudioInput": true,
+          "supportsVideoInput": true,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "thinking",
+              "label": "Thinking",
+              "type": "boolean"
+            }
+          ]
+        },
+        {
+          "id": "gemini-2.5-flash-lite",
+          "displayName": "Gemini 2.5 Flash-Lite",
+          "supportsImageInput": true,
+          "supportsAudioInput": true,
+          "supportsVideoInput": true,
+          "supportsPdfInput": true,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "thinking",
+              "label": "Thinking",
+              "type": "boolean"
+            }
+          ]
+        },
+        {
+          "id": "gemini-2.0-flash",
+          "displayName": "Gemini 2.0 Flash",
+          "supportsImageInput": true,
+          "supportsAudioInput": true,
+          "supportsVideoInput": true,
+          "supportsPdfInput": true,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        }
+      ]
+    },
+    {
+      "providerKey": "groq",
+      "displayName": "Groq",
+      "providerType": "api",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "openai/gpt-oss-120b",
+          "displayName": "GPT-OSS 120B",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "openai/gpt-oss-20b",
+          "displayName": "GPT-OSS 20B",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "meta-llama/llama-4-scout-17b-16e-instruct",
+          "displayName": "Llama 4 Scout 17B 16E",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "llama-3.3-70b-versatile",
+          "displayName": "Llama 3.3 70B Versatile",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "llama-3.1-8b-instant",
+          "displayName": "Llama 3.1 8B Instant",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        }
+      ]
+    },
+    {
+      "providerKey": "kilocode",
+      "displayName": "KiloCode",
+      "providerType": "api",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "kilo-auto/frontier",
+          "displayName": "Kilo Auto Frontier",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "kilo-auto/balanced",
+          "displayName": "Kilo Auto Balanced",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "kilo-auto/free",
+          "displayName": "Kilo Auto Free",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "anthropic/claude-sonnet-4.6",
+          "displayName": "Claude Sonnet 4.6",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "anthropic/claude-opus-4.6",
+          "displayName": "Claude Opus 4.6",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "openai/gpt-5.2",
+          "displayName": "GPT-5.2",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        }
+      ]
+    },
+    {
+      "providerKey": "openrouter",
+      "displayName": "OpenRouter",
+      "providerType": "api",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "openai/gpt-5.2",
+          "displayName": "GPT-5.2",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "openai/gpt-4.1",
+          "displayName": "GPT-4.1",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "openai/o3",
+          "displayName": "o3",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "anthropic/claude-opus-4",
+          "displayName": "Claude Opus 4",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "anthropic/claude-sonnet-4",
+          "displayName": "Claude Sonnet 4",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": true,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "google/gemini-2.5-pro",
+          "displayName": "Gemini 2.5 Pro",
+          "supportsImageInput": true,
+          "supportsAudioInput": true,
+          "supportsVideoInput": true,
+          "supportsPdfInput": true,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "google/gemini-2.5-flash",
+          "displayName": "Gemini 2.5 Flash",
+          "supportsImageInput": true,
+          "supportsAudioInput": true,
+          "supportsVideoInput": true,
+          "supportsPdfInput": true,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "meta-llama/llama-4-scout-17b-16e-instruct",
+          "displayName": "Llama 4 Scout 17B 16E",
+          "supportsImageInput": true,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "displayName": "GPT-OSS 120B",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        }
+      ]
+    },
+    {
+      "providerKey": "claude_code",
+      "displayName": "Claude Code",
+      "providerType": "cli",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "claude-opus-4-7",
+          "displayName": "Claude Opus 4.7",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                },
+                {
+                  "value": "xhigh",
+                  "label": "Extra High",
+                  "isDefault": true,
+                  "shortLabel": "xHigh"
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                },
+                {
+                  "value": "ultrathink",
+                  "label": "Ultrathink",
+                  "shortLabel": "Ultra"
+                }
+              ]
+            },
+            {
+              "id": "contextWindow",
+              "label": "Context",
+              "type": "select",
+              "options": [
+                {
+                  "value": "200k",
+                  "label": "200k",
+                  "isDefault": true
+                },
+                {
+                  "value": "1m",
+                  "label": "1M"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-opus-4-6",
+          "displayName": "Claude Opus 4.6",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                },
+                {
+                  "value": "xhigh",
+                  "label": "Extra High",
+                  "isDefault": true,
+                  "shortLabel": "xHigh"
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                },
+                {
+                  "value": "ultrathink",
+                  "label": "Ultrathink",
+                  "shortLabel": "Ultra"
+                }
+              ]
+            },
+            {
+              "id": "contextWindow",
+              "label": "Context",
+              "type": "select",
+              "options": [
+                {
+                  "value": "200k",
+                  "label": "200k",
+                  "isDefault": true
+                },
+                {
+                  "value": "1m",
+                  "label": "1M"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-opus-4-5",
+          "displayName": "Claude Opus 4.5",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "max",
+                  "label": "Max"
+                },
+                {
+                  "value": "ultrathink",
+                  "label": "Ultrathink",
+                  "shortLabel": "Ultra"
+                }
+              ]
+            },
+            {
+              "id": "contextWindow",
+              "label": "Context",
+              "type": "select",
+              "options": [
+                {
+                  "value": "200k",
+                  "label": "200k",
+                  "isDefault": true
+                },
+                {
+                  "value": "1m",
+                  "label": "1M"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "displayName": "Claude Sonnet 4.6",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": true,
+          "thinkingMode": "toggle",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "ultrathink",
+                  "label": "Ultrathink",
+                  "shortLabel": "Ultra"
+                }
+              ]
+            },
+            {
+              "id": "contextWindow",
+              "label": "Context",
+              "type": "select",
+              "options": [
+                {
+                  "value": "200k",
+                  "label": "200k",
+                  "isDefault": true
+                },
+                {
+                  "value": "1m",
+                  "label": "1M"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claude-haiku-4-5",
+          "displayName": "Claude Haiku 4.5",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        }
+      ]
+    },
+    {
+      "providerKey": "codex",
+      "displayName": "Codex",
+      "providerType": "cli",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "gpt-5.4",
+          "displayName": "GPT-5.4",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "xhigh",
+                  "label": "Extra High",
+                  "shortLabel": "xHigh"
+                }
+              ]
+            },
+            {
+              "id": "fastMode",
+              "label": "Fast Mode",
+              "type": "boolean",
+              "shortLabel": "Fast"
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.4-mini",
+          "displayName": "GPT-5.4 Mini",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            },
+            {
+              "id": "fastMode",
+              "label": "Fast Mode",
+              "type": "boolean",
+              "shortLabel": "Fast"
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.3-codex",
+          "displayName": "GPT-5.3 Codex",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "xhigh",
+                  "label": "Extra High",
+                  "shortLabel": "xHigh"
+                }
+              ]
+            },
+            {
+              "id": "fastMode",
+              "label": "Fast Mode",
+              "type": "boolean",
+              "shortLabel": "Fast"
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.3-codex-spark",
+          "displayName": "GPT-5.3 Codex Spark",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            },
+            {
+              "id": "fastMode",
+              "label": "Fast Mode",
+              "type": "boolean",
+              "shortLabel": "Fast"
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.2-codex",
+          "displayName": "GPT-5.2 Codex",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "xhigh",
+                  "label": "Extra High",
+                  "shortLabel": "xHigh"
+                }
+              ]
+            },
+            {
+              "id": "fastMode",
+              "label": "Fast Mode",
+              "type": "boolean",
+              "shortLabel": "Fast"
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.2",
+          "displayName": "GPT-5.2",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                },
+                {
+                  "value": "xhigh",
+                  "label": "Extra High",
+                  "shortLabel": "xHigh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.1-codex-max",
+          "displayName": "GPT-5.1 Codex Max",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "value": "high",
+                  "label": "High",
+                  "isDefault": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.1-codex-mini",
+          "displayName": "GPT-5.1 Codex Mini",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "providerKey": "opencode",
+      "displayName": "OpenCode",
+      "providerType": "cli",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "openai/gpt-5",
+          "displayName": "OpenAI GPT-5",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": [
+            {
+              "id": "effort",
+              "label": "Reasoning",
+              "type": "select",
+              "options": [
+                {
+                  "value": "low",
+                  "label": "Low"
+                },
+                {
+                  "value": "medium",
+                  "label": "Medium",
+                  "isDefault": true
+                },
+                {
+                  "value": "high",
+                  "label": "High"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "providerKey": "cursor",
+      "displayName": "Cursor",
+      "providerType": "cli",
+      "supportsPlanMode": false,
+      "models": [
+        {
+          "id": "composer-2.5",
+          "displayName": "Composer 2.5",
+          "supportsImageInput": false,
+          "supportsAudioInput": false,
+          "supportsVideoInput": false,
+          "supportsPdfInput": false,
+          "supportsThinking": false,
+          "thinkingMode": "unsupported",
+          "reasoningOptions": [],
+          "composerOptions": []
+        }
+      ]
+    }
+  ]
+}

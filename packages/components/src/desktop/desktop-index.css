@@ -1,0 +1,211 @@
+@import "driver.js/dist/driver.css";
+@import "@bitsentry-ce/components/tutorial/driver-theme.css";
+@import "@bitsentry-ce/components/theme/colors.css";
+@import "@bitsentry-ce/components/styles/chat-markdown.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Desktop overrides: brand cyan for primary/ring */
+  :root {
+    --primary: 190 100% 50%;
+    --ring: 190 100% 50%;
+  }
+
+  .dark {
+    --primary: 190 100% 50%;
+    --ring: 190 100% 50%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  html,
+  body,
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--scrollbar-thumb)) hsl(var(--scrollbar-track));
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: hsl(var(--scrollbar-track));
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--scrollbar-thumb));
+    border-radius: 9999px;
+    border: 2px solid hsl(var(--scrollbar-track));
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--scrollbar-thumb-hover));
+  }
+
+  /* Custom component styles */
+  .gauge-ring {
+    stroke-linecap: round;
+    transform-origin: center;
+    transform: rotate(-90deg);
+    transition: stroke-dashoffset 0.5s;
+  }
+
+  /* Sparkline styles */
+  .sparkline {
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+
+  .sparkline-area {
+    opacity: 0.2;
+  }
+
+  /* Data card styles */
+  .data-card {
+    @apply bg-card rounded-md border border-border transition-colors duration-200;
+  }
+
+  /* Window drag region (frameless titlebar) */
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .drag-region button,
+  .drag-region input,
+  .drag-region textarea,
+  .drag-region select,
+  .drag-region a {
+    -webkit-app-region: no-drag;
+  }
+
+  /* Navigation rail styles - OpenAI minimal design */
+  .nav-rail {
+    @apply bg-neutral-50/80 dark:bg-black/40 border-r border-border;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    border-radius: 0.375rem;
+    transition: all 150ms ease;
+  }
+
+  .nav-item:hover {
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--neutral-100) / 0.5);
+  }
+
+  .dark .nav-item:hover {
+    background-color: rgb(255 255 255 / 0.1);
+  }
+
+  .nav-item.active {
+    color: hsl(var(--foreground));
+    font-weight: 500;
+    background-color: hsl(var(--neutral-200) / 0.6);
+  }
+
+  .dark .nav-item.active {
+    background-color: rgb(255 255 255 / 0.15);
+  }
+
+  /* Severity pills — subtle tinted backgrounds with colored text */
+  .severity-critical {
+    @apply bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400;
+  }
+
+  .severity-high {
+    @apply bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400;
+  }
+
+  .severity-medium {
+    @apply bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400;
+  }
+
+  .severity-low {
+    @apply bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400;
+  }
+
+  .severity-info {
+    @apply bg-gray-50 text-gray-600 dark:bg-gray-800/30 dark:text-gray-400;
+  }
+
+  /* Custom scrollbar styles for threat list */
+  .threat-list-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .threat-list-scrollable::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .threat-list-scrollable::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .threat-list-scrollable::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  .threat-list-scrollable::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--border-hover));
+  }
+
+  /* Page content fade-in */
+  @keyframes page-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-enter {
+    animation: page-fade-in 200ms ease-out both;
+  }
+}
+
+/* Locale-aware typography. The `<html lang>` attribute is set by
+   <I18nProvider> to the active i18next locale, so :lang() selectors apply
+   automatically when the user switches language. */
+@layer base {
+  /* Chinese: relax line-height for CJK character density and ensure the font
+     stack falls back to a CJK system font. */
+  :lang(zh) body,
+  :lang(zh) h1, :lang(zh) h2, :lang(zh) h3,
+  :lang(zh) h4, :lang(zh) h5, :lang(zh) h6,
+  :lang(zh) p, :lang(zh) li {
+    line-height: 1.7;
+  }
+
+  :lang(zh),
+  :lang(zh) input, :lang(zh) textarea,
+  :lang(zh) select, :lang(zh) button {
+    font-family:
+      "Inter",
+      "Noto Sans SC",
+      "PingFang SC",
+      "Microsoft YaHei",
+      "微软雅黑",
+      "Segoe UI",
+      Arial,
+      sans-serif;
+  }
+}

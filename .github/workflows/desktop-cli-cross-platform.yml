@@ -1,0 +1,140 @@
+name: Desktop CLI Cross Platform
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/desktop-cli-cross-platform.yml'
+      - 'apps/desktop/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/desktop-cli-cross-platform.yml'
+      - 'apps/desktop/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-cli-cross-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cli-smoke:
+    name: CLI Smoke (${{ matrix.label }})
+    runs-on: ${{ matrix.runs_on }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS
+            runs_on: blacksmith-12vcpu-macos-26
+            package_command: pnpm run desktop:package:mac:arm64
+          - label: Linux
+            runs_on: blacksmith-4vcpu-ubuntu-2404
+            package_command: pnpm run desktop:package:linux
+          - label: Windows
+            runs_on: blacksmith-4vcpu-windows-2025
+            package_command: pnpm run desktop:package:win
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Initialize electron-trpc submodule
+        shell: bash
+        run: |
+          git config submodule.packages/electron-trpc.url https://github.com/bitsentry-ai/electron-trpc.git
+          git submodule update --init --depth 1 packages/electron-trpc
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+          run_install: false
+
+      - name: Install Linux runtime dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            dpkg \
+            fakeroot \
+            rpm \
+            libgtk-3-0 \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libnss3 \
+            libxss1 \
+            libasound2t64 \
+            libgbm1 \
+            libatk-bridge2.0-0
+
+      - name: Install dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Install electron-trpc dependencies
+        shell: bash
+        run: pnpm --dir packages/electron-trpc install --frozen-lockfile
+
+      - name: Ensure Electron binary is installed
+        shell: bash
+        run: pnpm --dir apps/desktop exec node node_modules/electron/install.js
+
+      - name: Install desktop native dependencies
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            pnpm --dir apps/desktop run prepare:native-deps -- --arch=x64
+          else
+            pnpm --dir apps/desktop run prepare:native-deps
+          fi
+
+      - name: Rebuild pending native dependencies
+        shell: bash
+        run: |
+          pnpm rebuild --pending
+          pnpm --dir packages/electron-trpc rebuild --pending
+
+      - name: Build shared packages
+        shell: bash
+        run: pnpm run build:packages
+
+      - name: Run desktop CLI smoke test
+        shell: bash
+        run: pnpm run desktop:test:cli
+
+      - name: Run desktop CLI stress test
+        shell: bash
+        run: pnpm run desktop:test:cli:stress
+
+      - name: Package desktop app for CLI wrapper smoke
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          DESKTOP_SKIP_SIGNATURE_CHECK: 'true'
+        run: ${{ matrix.package_command }}
+
+      - name: Run packaged desktop CLI smoke test
+        shell: bash
+        run: pnpm run desktop:test:cli:packaged
+
+      - name: Run packaged desktop CLI stress test
+        shell: bash
+        run: pnpm run desktop:test:cli:packaged:stress

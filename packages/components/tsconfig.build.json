@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES2021",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*", "types/**/*.d.ts"],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "src/desktop/DesktopRendererBrowserEntry.tsx"
+  ]
+}

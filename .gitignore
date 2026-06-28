@@ -1,0 +1,188 @@
+# Dependencies
+node_modules
+node_modules/
+packages/**/node_modules
+.pnp
+.pnp.js
+.obsidian/
+.playwright-mcp/
+
+# Testing
+coverage/
+.nyc_output
+
+# Production builds
+dist/
+build/
+out/
+
+# Generated Prisma clients
+apps/desktop/src/main/generated/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+/public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Database
+*.db
+*.sqlite
+
+# Husky
+.husky/_
+
+# Prisma
+prisma/migrations/migration_lock.toml
+
+# Local environment files
+.env.development
+.env.production
+
+# IDE and editor files
+*.sublime-*
+.vscode/
+.idea/
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Linux
+*~
+
+# Prevent accidental TypeScript emit from polluting package source trees.
+packages/**/src/**/*.js
+packages/**/src/**/*.js.map
+packages/**/src/**/*.d.ts
+packages/**/src/**/*.d.ts.map
+!packages/electron-trpc/www/src/env.d.ts
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# Package manager lock files (keeping pnpm-lock.yaml)
+package-lock.json
+yarn.lock
+.pnpm-store
+
+# Build outputs
+*.tgz
+*.tar.gz
+
+# Encore (apps/worker)
+.encore/
+encore.gen/
+encore.gen.go
+encore.gen.cue
+
+# AI IDE extensions
+.windsurf/
+.augment/
+.cursor/

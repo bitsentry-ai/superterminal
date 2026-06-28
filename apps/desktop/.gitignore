@@ -1,0 +1,30 @@
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Coverage directory
+coverage
+
+# Dependency directory
+node_modules
+
+# OS files
+.DS_Store
+
+# electron-vite build output
+out/
+dist/
+
+# electron-builder output
+release/build
+scripts/dist
+
+# IDE
+.idea
+
+npm-debug.log.*

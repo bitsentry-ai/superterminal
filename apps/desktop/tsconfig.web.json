@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/renderer/src/*"],
+      "zod": ["./node_modules/zod"],
+      "zod/*": ["./node_modules/zod/*"],
+      "@bitsentry-ce/components": ["../../packages/components/src/index.ts"],
+      "@bitsentry-ce/components/*": ["../../packages/components/src/*"],
+      "@bitsentry-ce/core": ["../../packages/core/src/index.ts"],
+      "@bitsentry-ce/core/*": ["../../packages/core/src/*"],
+      "@bitsentry-ce/i18n": ["../../packages/i18n/src/index.ts"],
+      "@bitsentry-ce/i18n/*": ["../../packages/i18n/src/*"],
+      "@dnd-kit/react": ["./node_modules/@dnd-kit/react"],
+      "@dnd-kit/react/*": ["./node_modules/@dnd-kit/react/*"],
+      "electron-trpc/renderer": [
+        "../../packages/electron-trpc/packages/electron-trpc/src/renderer/index.ts"
+      ]
+    }
+  },
+  "include": ["src/renderer/src/**/*"]
+}

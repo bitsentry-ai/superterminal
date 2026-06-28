@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "strict": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "paths": {
+      "@bitsentry-ce/i18n": ["./src/index.ts"],
+      "@bitsentry-ce/i18n/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}

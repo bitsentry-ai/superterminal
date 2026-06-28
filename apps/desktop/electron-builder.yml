@@ -1,0 +1,94 @@
+productName: SuperTerminal
+# Distinct from the Pro appId (`ai.bitsentry.desktop`) so macOS treats CE and
+# Pro as separate apps (permissions, notifications, Launch Services).
+appId: ai.bitsentry.desktop.ce
+copyright: Copyright © 2024-2026 BitSentry AI
+# Apple rejects `CFBundleVersion` values that start with `0`, so keep an
+# explicit positive build number while the app's marketing version remains `0.x`.
+buildVersion: "1"
+
+# Asar packaging for production
+asar: true
+npmRebuild: false
+asarUnpack:
+  - node_modules/better-sqlite3/build/Release/*.node
+  - node_modules/node-pty/build/Release/*.node
+  - node_modules/node-pty/prebuilds/win32-*/**/*
+
+# Build output
+directories:
+  buildResources: assets
+  output: release/build
+
+# Files to include in the app
+files:
+  - out/**/*
+  - "!node_modules/@bitsentry/**"
+
+extraResources:
+  - ./assets/**
+
+# ── macOS ────────────────────────────────────────────────────────────────────
+mac:
+  target:
+    - dmg
+    - zip
+  type: distribution
+  hardenedRuntime: true
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.plist
+  gatekeeperAssess: false
+  icon: assets/icon.icns
+  category: public.app-category.developer-tools
+  # Notarization — enabled when CSC_LINK / APPLE_ID env vars are set
+  notarize: false
+  artifactName: "${productName}.${ext}"
+
+dmg:
+  sign: false
+  contents:
+    - x: 130
+      "y": 220
+    - x: 410
+      "y": 220
+      type: link
+      path: /Applications
+
+# ── Windows (deferred — config placeholder) ─────────────────────────────────
+win:
+  target:
+    - nsis
+  icon: assets/icon.ico
+  artifactName: "${productName}.${ext}"
+
+nsis:
+  oneClick: false
+  perMachine: false
+
+# ── Linux (deferred — config placeholder) ────────────────────────────────────
+linux:
+  target:
+    - AppImage
+  icon: assets/icon.png
+  category: Development
+  artifactName: "${productName}.${ext}"
+
+# ── Auto-updater publish config ──────────────────────────────────────────────
+# Electron Builder requires a generic publish URL in config. CI always
+# overrides this per platform/arch via scripts/create-ci-builder-config.sh +
+# DESKTOP_UPDATE_BASE_URL, so the placeholder below is not used for published
+# release artifacts.
+publish:
+  provider: generic
+  url: https://downloads.bitsentry.ai/desktop-ce/releases/local-build-placeholder
+  channel: latest
+
+# ── Post-pack hooks ──────────────────────────────────────────────────────────
+afterPack: scripts/electron-builder-after-pack.js
+
+# ── After-sign hook for macOS notarization ───────────────────────────────────
+afterSign: scripts/dist/notarize.js
+
+# ── Source map handling ──────────────────────────────────────────────────────
+# Strip source maps from production builds
+removePackageScripts: true

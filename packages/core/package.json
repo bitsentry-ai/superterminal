@@ -1,0 +1,242 @@
+{
+  "name": "@bitsentry-ce/core",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./kernel": {
+      "types": "./dist/kernel/index.d.ts",
+      "default": "./dist/kernel/index.js"
+    },
+    "./features/cve-workflow": {
+      "types": "./dist/features/cve-workflow/index.d.ts",
+      "default": "./dist/features/cve-workflow/index.js"
+    },
+    "./features/cve-workflow/*": {
+      "types": "./dist/features/cve-workflow/*/index.d.ts",
+      "default": "./dist/features/cve-workflow/*/index.js"
+    },
+    "./features/cve-workflow/*/*": {
+      "types": "./dist/features/cve-workflow/*/*.d.ts",
+      "default": "./dist/features/cve-workflow/*/*.js"
+    },
+    "./features/cve": {
+      "types": "./dist/features/cve/index.d.ts",
+      "default": "./dist/features/cve/index.js"
+    },
+    "./features/cve/*": {
+      "types": "./dist/features/cve/*/index.d.ts",
+      "default": "./dist/features/cve/*/index.js"
+    },
+    "./features/cve/*/*": {
+      "types": "./dist/features/cve/*/*.d.ts",
+      "default": "./dist/features/cve/*/*.js"
+    },
+    "./features/telemetry-worker-workflow": {
+      "types": "./dist/features/telemetry-worker-workflow/index.d.ts",
+      "default": "./dist/features/telemetry-worker-workflow/index.js"
+    },
+    "./features/telemetry-worker-workflow/*": {
+      "types": "./dist/features/telemetry-worker-workflow/*/index.d.ts",
+      "default": "./dist/features/telemetry-worker-workflow/*/index.js"
+    },
+    "./features/telemetry-worker-workflow/*/*": {
+      "types": "./dist/features/telemetry-worker-workflow/*/*.d.ts",
+      "default": "./dist/features/telemetry-worker-workflow/*/*.js"
+    },
+    "./features/telemetry-worker": {
+      "types": "./dist/features/telemetry-worker/index.d.ts",
+      "default": "./dist/features/telemetry-worker/index.js"
+    },
+    "./features/telemetry-worker/*": {
+      "types": "./dist/features/telemetry-worker/*/index.d.ts",
+      "default": "./dist/features/telemetry-worker/*/index.js"
+    },
+    "./features/telemetry-worker/*/*": {
+      "types": "./dist/features/telemetry-worker/*/*.d.ts",
+      "default": "./dist/features/telemetry-worker/*/*.js"
+    },
+    "./features/diagnosis-worker-workflow": {
+      "types": "./dist/features/diagnosis-worker-workflow/index.d.ts",
+      "default": "./dist/features/diagnosis-worker-workflow/index.js"
+    },
+    "./features/diagnosis-worker-workflow/*": {
+      "types": "./dist/features/diagnosis-worker-workflow/*/index.d.ts",
+      "default": "./dist/features/diagnosis-worker-workflow/*/index.js"
+    },
+    "./features/diagnosis-worker-workflow/*/*": {
+      "types": "./dist/features/diagnosis-worker-workflow/*/*.d.ts",
+      "default": "./dist/features/diagnosis-worker-workflow/*/*.js"
+    },
+    "./features/diagnosis-worker": {
+      "types": "./dist/features/diagnosis-worker/index.d.ts",
+      "default": "./dist/features/diagnosis-worker/index.js"
+    },
+    "./features/diagnosis-worker/*": {
+      "types": "./dist/features/diagnosis-worker/*/index.d.ts",
+      "default": "./dist/features/diagnosis-worker/*/index.js"
+    },
+    "./features/diagnosis-worker/*/*": {
+      "types": "./dist/features/diagnosis-worker/*/*.d.ts",
+      "default": "./dist/features/diagnosis-worker/*/*.js"
+    },
+    "./features/telemetry-v3-workflow": {
+      "types": "./dist/features/telemetry-v3-workflow/index.d.ts",
+      "default": "./dist/features/telemetry-v3-workflow/index.js"
+    },
+    "./features/telemetry-v3-workflow/*": {
+      "types": "./dist/features/telemetry-v3-workflow/*/index.d.ts",
+      "default": "./dist/features/telemetry-v3-workflow/*/index.js"
+    },
+    "./features/telemetry-v3-workflow/*/*": {
+      "types": "./dist/features/telemetry-v3-workflow/*/*.d.ts",
+      "default": "./dist/features/telemetry-v3-workflow/*/*.js"
+    },
+    "./features/telemetry-v3": {
+      "types": "./dist/features/telemetry-v3/index.d.ts",
+      "default": "./dist/features/telemetry-v3/index.js"
+    },
+    "./features/telemetry-v3/*": {
+      "types": "./dist/features/telemetry-v3/*/index.d.ts",
+      "default": "./dist/features/telemetry-v3/*/index.js"
+    },
+    "./features/telemetry-v3/*/*": {
+      "types": "./dist/features/telemetry-v3/*/*.d.ts",
+      "default": "./dist/features/telemetry-v3/*/*.js"
+    },
+    "./features/wazuh-workflow": {
+      "types": "./dist/features/wazuh-workflow/index.d.ts",
+      "default": "./dist/features/wazuh-workflow/index.js"
+    },
+    "./features/wazuh-workflow/*": {
+      "types": "./dist/features/wazuh-workflow/*/index.d.ts",
+      "default": "./dist/features/wazuh-workflow/*/index.js"
+    },
+    "./features/wazuh-workflow/*/*": {
+      "types": "./dist/features/wazuh-workflow/*/*.d.ts",
+      "default": "./dist/features/wazuh-workflow/*/*.js"
+    },
+    "./features/wazuh": {
+      "types": "./dist/features/wazuh/index.d.ts",
+      "default": "./dist/features/wazuh/index.js"
+    },
+    "./features/wazuh/*": {
+      "types": "./dist/features/wazuh/*/index.d.ts",
+      "default": "./dist/features/wazuh/*/index.js"
+    },
+    "./features/wazuh/*/*": {
+      "types": "./dist/features/wazuh/*/*.d.ts",
+      "default": "./dist/features/wazuh/*/*.js"
+    },
+    "./features/agents/agents.schemas": {
+      "types": "./dist/features/agents/agents.schemas.d.ts",
+      "default": "./dist/features/agents/agents.schemas.js"
+    },
+    "./features/analytics/analytics.schemas": {
+      "types": "./dist/features/analytics/analytics.schemas.d.ts",
+      "default": "./dist/features/analytics/analytics.schemas.js"
+    },
+    "./features/agent-runtime": {
+      "types": "./dist/features/agent-runtime/index.d.ts",
+      "default": "./dist/features/agent-runtime/index.js"
+    },
+    "./features/agent-runtime/types": {
+      "types": "./dist/features/agent-runtime/types.d.ts",
+      "default": "./dist/features/agent-runtime/types.js"
+    },
+    "./features/agent-runtime/shared/capability-registry": {
+      "types": "./dist/features/agent-runtime/shared/capability-registry.d.ts",
+      "default": "./dist/features/agent-runtime/shared/capability-registry.js"
+    },
+    "./features/agent-runtime/shared/ssh-journal-query-builder": {
+      "types": "./dist/features/agent-runtime/shared/ssh-journal-query-builder.d.ts",
+      "default": "./dist/features/agent-runtime/shared/ssh-journal-query-builder.js"
+    },
+    "./features/audit-logs/audit-logs.schemas": {
+      "types": "./dist/features/audit-logs/audit-logs.schemas.d.ts",
+      "default": "./dist/features/audit-logs/audit-logs.schemas.js"
+    },
+    "./features/auth/auth.schemas": {
+      "types": "./dist/features/auth/auth.schemas.d.ts",
+      "default": "./dist/features/auth/auth.schemas.js"
+    },
+    "./features/diagnosis/diagnosis.schemas": {
+      "types": "./dist/features/diagnosis/diagnosis.schemas.d.ts",
+      "default": "./dist/features/diagnosis/diagnosis.schemas.js"
+    },
+    "./features/integrations/integrations.schemas": {
+      "types": "./dist/features/integrations/integrations.schemas.d.ts",
+      "default": "./dist/features/integrations/integrations.schemas.js"
+    },
+    "./features/reports/reports.schemas": {
+      "types": "./dist/features/reports/reports.schemas.d.ts",
+      "default": "./dist/features/reports/reports.schemas.js"
+    },
+    "./features/runbooks/desktop-runbook.types": {
+      "types": "./dist/features/runbooks/desktop-runbook.types.d.ts",
+      "default": "./dist/features/runbooks/desktop-runbook.types.js"
+    },
+    "./features/runbooks/desktop-runbook-ce.types": {
+      "types": "./dist/features/runbooks/desktop-runbook-ce.types.d.ts",
+      "default": "./dist/features/runbooks/desktop-runbook-ce.types.js"
+    },
+    "./features/runbooks/desktop-runbook-pro.types": {
+      "types": "./dist/features/runbooks/desktop-runbook-pro.types.d.ts",
+      "default": "./dist/features/runbooks/desktop-runbook-pro.types.js"
+    },
+    "./features/settings/settings.schemas": {
+      "types": "./dist/features/settings/settings.schemas.d.ts",
+      "default": "./dist/features/settings/settings.schemas.js"
+    },
+    "./features/threat-intelligence/threat-intelligence.schemas": {
+      "types": "./dist/features/threat-intelligence/threat-intelligence.schemas.d.ts",
+      "default": "./dist/features/threat-intelligence/threat-intelligence.schemas.js"
+    },
+    "./features/tickets/tickets.schemas": {
+      "types": "./dist/features/tickets/tickets.schemas.d.ts",
+      "default": "./dist/features/tickets/tickets.schemas.js"
+    },
+    "./features/users/users.schemas": {
+      "types": "./dist/features/users/users.schemas.d.ts",
+      "default": "./dist/features/users/users.schemas.js"
+    },
+    "./features/vulnerabilities/vulnerabilities.schemas": {
+      "types": "./dist/features/vulnerabilities/vulnerabilities.schemas.d.ts",
+      "default": "./dist/features/vulnerabilities/vulnerabilities.schemas.js"
+    },
+    "./features/*/*": {
+      "types": "./dist/features/*/*.d.ts",
+      "default": "./dist/features/*/*.js"
+    },
+    "./features/*": {
+      "types": "./dist/features/*/index.d.ts",
+      "default": "./dist/features/*/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "drizzle-orm": "^0.45.2",
+    "electron-log": "^5.4.3",
+    "yaml": "^2.9.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.3.0",
+    "typescript": "^5.9.3"
+  }
+}

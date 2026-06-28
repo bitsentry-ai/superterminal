@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "paths": {
+      "@bitsentry-ce/core": ["../core/dist/index.d.ts"],
+      "@bitsentry-ce/core/*": ["../core/dist/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}
