@@ -7,13 +7,25 @@ import type {
   OAuthProviderConfig,
 } from "./desktop-oauth-manager";
 import { getProviderForSource } from "./desktop-posthog-provider-binding";
-import {
-  isOAuthPluginErrorSourceType,
-  type OAuthPluginErrorSourceType,
-} from "./plugin-backed-error-sources";
 
+type RefreshOAuthProviderConfig = Pick<
+  OAuthProviderConfig,
+  "envClientIdName" | "envClientSecretName" | "publicClient"
+>;
+
+type BuiltInRefreshOAuthSourceType = "sentry" | "posthog";
 type DesktopOAuthProviderConfigMap = Record<
-  OAuthPluginErrorSourceType,
+  BuiltInRefreshOAuthSourceType,
+  RefreshOAuthProviderConfig
+> &
+  Partial<
+    Record<
+      ErrorSourceType,
+      RefreshOAuthProviderConfig
+    >
+  >;
+
+type PluginOAuthProviderConfigOverride = Partial<
   Pick<
     OAuthProviderConfig,
     "envClientIdName" | "envClientSecretName" | "publicClient"
@@ -32,13 +44,6 @@ const DESKTOP_OAUTH_PROVIDER_CONFIGS: DesktopOAuthProviderConfigMap = {
     publicClient: true,
   },
 };
-
-type PluginOAuthProviderConfigOverride = Partial<
-  Pick<
-    OAuthProviderConfig,
-    "envClientIdName" | "envClientSecretName" | "publicClient"
-  >
->;
 
 type DesktopPluginMetadataLike = {
   metadata?: {
@@ -68,14 +73,57 @@ function getRequiredEnv(name: string): string {
 
 function getProviderConfig(
   sourceType: ErrorSourceType,
-):
-  | DesktopOAuthProviderConfigMap[OAuthPluginErrorSourceType]
-  | undefined {
-  if (isOAuthPluginErrorSourceType(sourceType)) {
-    return DESKTOP_OAUTH_PROVIDER_CONFIGS[sourceType];
+): RefreshOAuthProviderConfig | undefined {
+  return DESKTOP_OAUTH_PROVIDER_CONFIGS[sourceType];
+}
+
+function readMissingProviderConfigKeys(
+  config: Partial<RefreshOAuthProviderConfig>,
+): string[] {
+  const missing: string[] = [];
+
+  if (
+    typeof config.envClientIdName !== "string" ||
+    config.envClientIdName.trim().length === 0
+  ) {
+    missing.push("envClientIdName");
+  }
+  if (
+    typeof config.envClientSecretName !== "string" ||
+    config.envClientSecretName.trim().length === 0
+  ) {
+    missing.push("envClientSecretName");
+  }
+  if (typeof config.publicClient !== "boolean") {
+    missing.push("publicClient");
   }
 
-  return undefined;
+  return missing;
+}
+
+function mergeProviderConfig(input: {
+  sourceType: ErrorSourceType;
+  baseConfig?: RefreshOAuthProviderConfig;
+  pluginOverride?: PluginOAuthProviderConfigOverride;
+}): RefreshOAuthProviderConfig {
+  if (input.baseConfig === undefined && input.pluginOverride === undefined) {
+    throw new Error(
+      `OAuth refresh is not configured for source type: ${input.sourceType}`,
+    );
+  }
+
+  const merged: Partial<RefreshOAuthProviderConfig> = {
+    ...(input.baseConfig ?? {}),
+    ...(input.pluginOverride ?? {}),
+  };
+  const missingKeys = readMissingProviderConfigKeys(merged);
+  if (missingKeys.length > 0) {
+    throw new Error(
+      `OAuth refresh config for source type "${input.sourceType}" is incomplete. Missing: ${missingKeys.join(", ")}`,
+    );
+  }
+
+  return merged as RefreshOAuthProviderConfig;
 }
 
 function readSourcePluginId(source: Pick<DesktopOAuthSource, "sourceType" | "additionalMetadata">): string {
@@ -169,7 +217,7 @@ function getNextGrantedScopes(
 }
 
 function getClientSecret(
-  config: DesktopOAuthProviderConfigMap[OAuthPluginErrorSourceType],
+  config: RefreshOAuthProviderConfig,
   sourceConfigSecret: unknown,
 ): string {
   const configuredSecret = readOptionalString(sourceConfigSecret);
@@ -332,24 +380,15 @@ async function performTokenRefresh<
   });
   const config = source.configuration ?? {};
   const providerConfig = getProviderConfig(source.sourceType);
-  if (providerConfig === undefined) {
-    throw new Error(
-      `OAuth refresh is not configured for source type: ${source.sourceType}`,
-    );
-  }
   const pluginConfigOverride = getPluginProviderConfigOverride(
     source,
     providerFactory,
   );
-  const effectiveProviderConfig = {
-    envClientIdName:
-      pluginConfigOverride?.envClientIdName ?? providerConfig.envClientIdName,
-    envClientSecretName:
-      pluginConfigOverride?.envClientSecretName ??
-      providerConfig.envClientSecretName,
-    publicClient:
-      pluginConfigOverride?.publicClient ?? providerConfig.publicClient,
-  };
+  const effectiveProviderConfig = mergeProviderConfig({
+    sourceType: source.sourceType,
+    baseConfig: providerConfig,
+    pluginOverride: pluginConfigOverride,
+  });
   const oauthClientId =
     readOptionalString(config.oauthClientId) ??
     getRequiredEnv(effectiveProviderConfig.envClientIdName);

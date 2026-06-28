@@ -352,7 +352,7 @@ export function createDesktopIpcPayloadValidator(
     }),
     "errorSources:probeConnection": z.object({
       pluginId: z.string().min(1).optional(),
-      sourceType: z.enum(["sentry", "posthog"]),
+      sourceType: z.string().min(1),
       authToken: z.string().min(1),
       baseUrl: z.url().optional(),
       posthogBaseUrl: z.url().optional(),
