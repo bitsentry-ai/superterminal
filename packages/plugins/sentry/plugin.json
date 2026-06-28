@@ -176,7 +176,28 @@
         }
       ],
       "transport": {
-        "kind": "builtin"
+        "kind": "http",
+        "method": "GET",
+        "url": "https://sentry.io/api/0/organizations/{{input.orgSlug}}/issues/",
+        "headers": {
+          "Authorization": "Bearer {{auth.accessToken}}",
+          "Accept": "application/json"
+        },
+        "query": {
+          "project": "{{input.projectIds}}",
+          "query": "{{input.query}}",
+          "limit": "{{input.limit}}",
+          "cursor": "{{input.cursor}}"
+        },
+        "response": {
+          "itemsKey": "issues",
+          "pagination": {
+            "kind": "link_header_cursor"
+          }
+        },
+        "successStatusCodes": [
+          200
+        ]
       }
     },
     {
@@ -264,7 +285,28 @@
         }
       ],
       "transport": {
-        "kind": "builtin"
+        "kind": "http",
+        "method": "GET",
+        "url": "https://sentry.io/api/0/organizations/{{input.orgSlug}}/issues/{{input.issueId}}/events/",
+        "headers": {
+          "Authorization": "Bearer {{auth.accessToken}}",
+          "Accept": "application/json"
+        },
+        "query": {
+          "limit": "50",
+          "cursor": "{{input.cursor}}",
+          "start": "{{input.since}}",
+          "end": "{{input.until}}"
+        },
+        "response": {
+          "itemsKey": "events",
+          "pagination": {
+            "kind": "link_header_cursor"
+          }
+        },
+        "successStatusCodes": [
+          200
+        ]
       }
     }
   ],

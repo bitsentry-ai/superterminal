@@ -329,6 +329,95 @@ function resolveSameOriginNextUrl(nextUrl: unknown, currentUrl: URL): URL | null
   return resolved;
 }
 
+function readQuotedHeaderAttribute(segment: string, key: string): string | undefined {
+  const match = segment.match(new RegExp(`${key}="([^"]+)"`, "i"));
+  const value = match?.[1];
+  if (value !== undefined && value.length > 0) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function parseLinkHeaderCursorPagination(input: {
+  response: Response;
+  header?: string;
+  relation?: string;
+  cursorQueryParam?: string;
+  hasMoreParam?: string;
+  truthyValue?: string;
+}): {
+  nextCursor?: string;
+  hasMore: boolean;
+} {
+  const headerName = input.header ?? "link";
+  const relation = (input.relation ?? "next").toLowerCase();
+  const cursorQueryParam = input.cursorQueryParam ?? "cursor";
+  const hasMoreParam = input.hasMoreParam ?? "results";
+  const truthyValue = (input.truthyValue ?? "true").toLowerCase();
+  const rawHeader = input.response.headers.get(headerName);
+  if (rawHeader === null || rawHeader.length === 0) {
+    return { hasMore: false };
+  }
+
+  const segments = rawHeader.split(",").map((part) => part.trim());
+  for (const segment of segments) {
+    const segmentRelation = readQuotedHeaderAttribute(segment, "rel")?.toLowerCase();
+    if (segmentRelation !== relation) {
+      continue;
+    }
+
+    const hasMore =
+      (readQuotedHeaderAttribute(segment, hasMoreParam) ?? "").toLowerCase() ===
+      truthyValue;
+    const explicitCursor = readQuotedHeaderAttribute(segment, cursorQueryParam);
+    if (explicitCursor !== undefined) {
+      return {
+        nextCursor: explicitCursor,
+        hasMore,
+      };
+    }
+
+    const urlMatch = segment.match(/<([^>]+)>/);
+    const nextUrl = urlMatch?.[1];
+    if (nextUrl === undefined || nextUrl.length === 0) {
+      return { hasMore };
+    }
+
+    try {
+      const parsed = new URL(nextUrl);
+      const nextCursor = parsed.searchParams.get(cursorQueryParam) ?? undefined;
+      return nextCursor === undefined ? { hasMore } : { nextCursor, hasMore };
+    } catch {
+      return { hasMore };
+    }
+  }
+
+  return { hasMore: false };
+}
+
+function readHttpResponseItems(
+  input: {
+    actionId: string;
+    data: unknown;
+    itemsPath?: string;
+  },
+): unknown[] {
+  const items =
+    input.itemsPath === undefined
+      ? input.data
+      : readPathValue(input.data, input.itemsPath);
+  if (!Array.isArray(items)) {
+    throw new Error(
+      input.itemsPath === undefined
+        ? `Plugin action "${input.actionId}" expected an array response body.`
+        : `Plugin action "${input.actionId}" expected response items at "${input.itemsPath}".`,
+    );
+  }
+
+  return items;
+}
+
 async function parseHttpPluginResponse(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
@@ -1098,6 +1187,38 @@ function createLocalHttpPluginAction(
           status: response.status,
           summary: `${transport.method} ${url.pathname} completed successfully.`,
           data: aggregated,
+        };
+      }
+
+      if (transport.response !== undefined) {
+        const items = readHttpResponseItems({
+          actionId: action.id,
+          data,
+          itemsPath: transport.response.itemsPath,
+        });
+        const pagination =
+          transport.response.pagination?.kind === "link_header_cursor"
+            ? parseLinkHeaderCursorPagination({
+                response,
+                header: transport.response.pagination.header,
+                relation: transport.response.pagination.relation,
+                cursorQueryParam:
+                  transport.response.pagination.cursorQueryParam,
+                hasMoreParam: transport.response.pagination.hasMoreParam,
+                truthyValue: transport.response.pagination.truthyValue,
+              })
+            : { hasMore: false as boolean, nextCursor: undefined as string | undefined };
+
+        return {
+          status: response.status,
+          summary: `${transport.method} ${url.pathname} completed successfully.`,
+          data: {
+            [transport.response.itemsKey]: items,
+            [transport.response.nextCursorKey ?? "nextCursor"]:
+              pagination.nextCursor,
+            [transport.response.hasMoreKey ?? "hasMore"]:
+              pagination.hasMore,
+          },
         };
       }
 

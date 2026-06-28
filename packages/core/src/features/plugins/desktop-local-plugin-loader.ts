@@ -16,6 +16,23 @@ const desktopLocalHttpPluginPaginationSchema = z.object({
   maxPages: z.number().int().positive().max(50).optional(),
 });
 
+const desktopLocalHttpPluginResponsePaginationSchema = z.object({
+  kind: z.literal("link_header_cursor"),
+  header: z.string().min(1).optional(),
+  relation: z.string().min(1).optional(),
+  cursorQueryParam: z.string().min(1).optional(),
+  hasMoreParam: z.string().min(1).optional(),
+  truthyValue: z.string().min(1).optional(),
+});
+
+const desktopLocalHttpPluginResponseSchema = z.object({
+  itemsKey: z.string().min(1),
+  itemsPath: z.string().min(1).optional(),
+  nextCursorKey: z.string().min(1).optional(),
+  hasMoreKey: z.string().min(1).optional(),
+  pagination: desktopLocalHttpPluginResponsePaginationSchema.optional(),
+});
+
 const desktopLocalHttpPluginTransportSchema = z.object({
   kind: z.literal("http"),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
@@ -25,6 +42,7 @@ const desktopLocalHttpPluginTransportSchema = z.object({
   body: z.unknown().optional(),
   successStatusCodes: z.array(z.number().int().nonnegative()).optional(),
   pagination: desktopLocalHttpPluginPaginationSchema.optional(),
+  response: desktopLocalHttpPluginResponseSchema.optional(),
 });
 
 const desktopLocalBuiltinPluginTransportSchema = z.object({
