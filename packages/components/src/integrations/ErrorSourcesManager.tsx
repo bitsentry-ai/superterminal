@@ -469,13 +469,6 @@ interface ProviderCard {
   icon: ProviderIconKind;
 }
 
-function readProviderSortOrder(sourceType: ErrorSourceType): number {
-  if (sourceType === "sentry") return 0;
-  if (sourceType === "wazuh") return 1;
-  if (sourceType === "posthog") return 2;
-  return 99;
-}
-
 function FieldLabel({ children, required = false }: FieldLabelProps) {
   let requiredMarker: ReactNode = null;
   if (required) {
@@ -522,9 +515,9 @@ export default function ErrorSourcesManager({
 
   // ---- Create-source dialog state ----
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [sourceType, setSourceType] = useState<ErrorSourceType>("sentry");
-  const [selectedProviderId, setSelectedProviderId] = useState("sentry");
-  const [sourceName, setSourceName] = useState("Sentry");
+  const [sourceType, setSourceType] = useState<ErrorSourceType>("");
+  const [selectedProviderId, setSelectedProviderId] = useState("");
+  const [sourceName, setSourceName] = useState("");
   const [authToken, setAuthToken] = useState("");
 
   // Wazuh-only state (no probe — Wazuh has no orgs/projects concept).
@@ -627,13 +620,6 @@ export default function ErrorSourcesManager({
           ];
         })
         .sort((left, right) => {
-          const sourceTypeOrder =
-            readProviderSortOrder(left.sourceType) -
-            readProviderSortOrder(right.sourceType);
-          if (sourceTypeOrder !== 0) {
-            return sourceTypeOrder;
-          }
-
           const labelOrder = left.label.localeCompare(right.label);
           if (labelOrder !== 0) {
             return labelOrder;
@@ -716,6 +702,16 @@ export default function ErrorSourcesManager({
   }, [pendingSyncIds, refetchSources]);
 
   useEffect(() => {
+    if (providerCards.length === 0) {
+      if (selectedProviderId.length > 0) {
+        setSelectedProviderId("");
+      }
+      if (sourceType.length > 0) {
+        setSourceType("");
+      }
+      return;
+    }
+
     if (selectedProviderCard !== null) {
       if (selectedProviderCard.sourceType !== sourceType) {
         setSourceType(selectedProviderCard.sourceType);
@@ -732,7 +728,7 @@ export default function ErrorSourcesManager({
         setSourceType(fallbackCard.sourceType);
       }
     }
-  }, [providerCards, selectedProviderCard, sourceType]);
+  }, [providerCards, selectedProviderCard, selectedProviderId, sourceType]);
 
   function resetCreateDialog() {
     setAuthToken("");
@@ -1179,11 +1175,9 @@ export default function ErrorSourcesManager({
 
   // ---- Render helpers ----
 
-  let namePlaceholderKey = "common.errorSourcesManager.namePlaceholderPosthog";
-  if (sourceType === "sentry") {
-    namePlaceholderKey = "common.errorSourcesManager.namePlaceholderSentry";
-  } else if (sourceType === "wazuh") {
-    namePlaceholderKey = "common.errorSourcesManager.namePlaceholderWazuh";
+  let namePlaceholder = "Source name";
+  if (selectedProviderCard !== null) {
+    namePlaceholder = `My organization's ${selectedProviderCard.label}`;
   }
 
   let statusContent: ReactNode = null;
@@ -1527,7 +1521,7 @@ export default function ErrorSourcesManager({
                 {t("common.errorSourcesManager.labelName")}
               </FieldLabel>
               <Input
-                placeholder={t(namePlaceholderKey)}
+                placeholder={namePlaceholder}
                 value={sourceName}
                 onChange={(e) => { setSourceName(e.target.value); }}
               />
