@@ -295,29 +295,14 @@ function readPluginSetupFieldDisplayValue(
   switch (field.target) {
     case "organizationSlug":
     case "organizationId":
-      return readStringFromConfig(config, "orgSlug");
+      return readStringFromConfig(config, key);
     case "projectSlugs":
-      return readStringArrayFromConfig(config, "projectSlugs");
-    case "projectIds": {
-      const configuredProjectIds = readStringArrayFromConfig(config, "projectIds");
-      if (configuredProjectIds.length > 0) {
-        return configuredProjectIds;
-      }
-
-      return readStringArrayFromConfig(config, "projectSlugs");
-    }
-    case "baseUrl": {
-      if (source.sourceType === "posthog") {
-        return (
-          readStringFromConfig(config, "posthogBaseUrl") ||
-          readStringFromConfig(config, "baseUrl")
-        );
-      }
-
-      return readStringFromConfig(config, "baseUrl");
-    }
+    case "projectIds":
+      return readStringArrayFromConfig(config, key);
+    case "baseUrl":
+      return readStringFromConfig(config, key);
     case "indexPatterns":
-      return readStringArrayFromConfig(config, "indexPatterns");
+      return readStringArrayFromConfig(config, key);
     case "authToken":
       return "";
     default: {
@@ -343,102 +328,6 @@ function buildInitialEditSetupFieldValues(
   const setupFields = plugin?.metadata?.errorSource?.setupFields ?? [];
   return Object.fromEntries(
     setupFields.map((field) => [field.key, readPluginSetupFieldDisplayValue(source, field)]),
-  );
-}
-
-function renderLegacyEditConnectionFields(
-  source: ErrorSourceRow,
-  t: (key: string) => string,
-): ReactNode {
-  const config = source.configuration;
-
-  if (source.sourceType === "sentry") {
-    return (
-      <>
-        <div className="space-y-1">
-          <FieldLabel>
-            {t("common.errorSourcesManager.labelOrganization")}
-          </FieldLabel>
-          <Input
-            value={readStringFromConfig(config, "orgSlug")}
-            readOnly
-            disabled
-          />
-        </div>
-        <div className="space-y-1">
-          <FieldLabel>
-            {t("common.errorSourcesManager.labelProjects")}
-          </FieldLabel>
-          <Input
-            value={readStringArrayFromConfig(config, "projectSlugs")}
-            readOnly
-            disabled
-          />
-        </div>
-      </>
-    );
-  }
-
-  if (source.sourceType === "posthog") {
-    return (
-      <>
-        <div className="space-y-1">
-          <FieldLabel>
-            {t("common.errorSourcesManager.labelPosthogHost")}
-          </FieldLabel>
-          <Input
-            value={readStringFromConfig(config, "posthogBaseUrl")}
-            readOnly
-            disabled
-          />
-        </div>
-        <div className="space-y-1">
-          <FieldLabel>
-            {t("common.errorSourcesManager.labelOrganization")}
-          </FieldLabel>
-          <Input
-            value={readStringFromConfig(config, "orgSlug")}
-            readOnly
-            disabled
-          />
-        </div>
-        <div className="space-y-1">
-          <FieldLabel>
-            {t("common.errorSourcesManager.labelProjects")}
-          </FieldLabel>
-          <Input
-            value={readStringArrayFromConfig(config, "projectIds")}
-            readOnly
-            disabled
-          />
-        </div>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <div className="space-y-1">
-        <FieldLabel>
-          {t("common.errorSourcesManager.labelApiBaseUrl")}
-        </FieldLabel>
-        <Input
-          value={readStringFromConfig(config, "baseUrl")}
-          readOnly
-          disabled
-        />
-      </div>
-      <div className="space-y-1">
-        <FieldLabel>
-          {t("common.errorSourcesManager.labelIndexPatterns")}
-        </FieldLabel>
-        <Input
-          value={readStringArrayFromConfig(config, "indexPatterns")}
-          readOnly
-          disabled
-        />
-      </div>
-    </>
   );
 }
 
@@ -1745,7 +1634,6 @@ export default function ErrorSourcesManager({
               </div>
 
               {renderEditConnectionFields({
-                source: editDialogSource,
                 plugin: editDialogPlugin,
                 values: editSetupFieldValues,
                 onChange: (fieldKey, nextValue) => {
@@ -1754,7 +1642,6 @@ export default function ErrorSourcesManager({
                     [fieldKey]: nextValue,
                   }));
                 },
-                t,
                 disabled: updateMutation.isPending,
               })}
 
@@ -1851,18 +1738,20 @@ function readStringArrayFromConfig(
 }
 
 function renderEditConnectionFields(input: {
-  source: ErrorSourceRow;
   plugin: PluginDescriptor | null;
   values: Record<string, string>;
   onChange: (fieldKey: string, nextValue: string) => void;
-  t: (key: string) => string;
   disabled: boolean;
 }): ReactNode {
-  const { source, plugin, values, onChange, t, disabled } = input;
+  const { plugin, values, onChange, disabled } = input;
   const setupFields = plugin?.metadata?.errorSource?.setupFields ?? [];
 
   if (setupFields.length === 0) {
-    return renderLegacyEditConnectionFields(source, t);
+    return (
+      <div className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+        Install or enable this source's code plugin to edit connection fields.
+      </div>
+    );
   }
 
   return (
