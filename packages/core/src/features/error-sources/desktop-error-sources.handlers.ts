@@ -391,6 +391,15 @@ function readPluginErrorSourceSetupFields(
   return plugin?.metadata?.errorSource?.setupFields ?? []
 }
 
+function hasMatchingErrorSourcePlugin(
+  pluginRuntime: DesktopPluginRuntimeService,
+  pluginId: string,
+  sourceType: ErrorSourceType,
+): boolean {
+  const errorSource = pluginRuntime.getPlugin(pluginId)?.metadata?.errorSource
+  return errorSource?.sourceType === sourceType
+}
+
 function resolvePersistedPluginSetup(
   pluginRuntime: DesktopPluginRuntimeService,
   pluginId: string,
@@ -863,6 +872,11 @@ export function createDesktopErrorSourcesHandlers(
         pluginId,
         setupValues,
       )
+      const usePluginCreatePath = hasMatchingErrorSourcePlugin(
+        pluginRuntime,
+        pluginId,
+        sourceType,
+      )
       const authToken =
         readSetupTrimmed(setupValues, 'authToken') ??
         payload.authToken?.trim() ??
@@ -870,7 +884,7 @@ export function createDesktopErrorSourcesHandlers(
         ''
       const sourceName = payload.name
 
-      if (sourceType === 'sentry') {
+      if (!usePluginCreatePath && sourceType === 'sentry') {
         const organizationSlug =
           readSetupTrimmed(setupValues, 'organizationSlug') ??
           readSetupTrimmed(setupValues, 'organizationId') ??
@@ -956,7 +970,7 @@ export function createDesktopErrorSourcesHandlers(
         }
       }
 
-      if (sourceType === 'posthog') {
+      if (!usePluginCreatePath && sourceType === 'posthog') {
         if (authToken.length === 0) {
           log.warn('[error-sources] create: missing authToken')
           throw new Error('authToken is required')
@@ -1190,6 +1204,28 @@ export function createDesktopErrorSourcesHandlers(
         const legacyBaseUrl = readOptionalTrimmed(payload.baseUrl)
         if (legacyBaseUrl !== undefined) {
           customPluginConfiguration.baseUrl = legacyBaseUrl
+        }
+        const sentryBaseUrl = readOptionalTrimmed(payload.sentryBaseUrl)
+        if (sentryBaseUrl !== undefined) {
+          customPluginConfiguration.sentryBaseUrl = sentryBaseUrl
+        }
+        const posthogBaseUrl = readOptionalTrimmed(payload.posthogBaseUrl)
+        if (posthogBaseUrl !== undefined) {
+          customPluginConfiguration.posthogBaseUrl = posthogBaseUrl
+        }
+        const organizationSlug = readOptionalTrimmed(
+          payload.organizationSlug ?? payload.organizationId,
+        )
+        if (organizationSlug !== undefined) {
+          customPluginConfiguration.orgSlug = organizationSlug
+        }
+        const projectSlugs = readStringArray(payload.projectSlugs)
+        if (projectSlugs.length > 0) {
+          customPluginConfiguration.projectSlugs = projectSlugs
+        }
+        const projectIds = readStringArray(payload.projectIds)
+        if (projectIds.length > 0) {
+          customPluginConfiguration.projectIds = projectIds
         }
         if (Array.isArray(payload.indexPatterns)) {
           customPluginConfiguration.indexPatterns = readStringArray(

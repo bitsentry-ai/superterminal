@@ -72,12 +72,23 @@ function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
   }
 }
 
-function createDb(): DbClient {
+function createTestDb() {
   const now = new Date().toISOString()
+  const create = vi.fn(
+    ({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        ...data,
+        lastSyncAt: null,
+        lastSyncStatus: null,
+        lastSyncError: null,
+        createdAt: now,
+        updatedAt: now,
+      }),
+  )
 
   const db: unknown = {
     errorSource: {
-      create: vi.fn(),
+      create,
       delete: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn().mockResolvedValue({
@@ -108,7 +119,11 @@ function createDb(): DbClient {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
   }
-  return db as DbClient
+  return { db: db as DbClient, create }
+}
+
+function createDb(): DbClient {
+  return createTestDb().db
 }
 
 describe('desktop error source handlers', () => {
@@ -160,6 +175,66 @@ describe('desktop error source handlers', () => {
       orgSlug: 'org-1',
       projectIds: ['177710'],
       sourceType: 'posthog',
+    })
+  })
+
+  it('creates built-in-named sources through matching code plugin metadata', async () => {
+    vi.useFakeTimers()
+    const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])
+    const { db, create } = createTestDb()
+    const oauthBindings = createDesktopOauthManagerBindings(
+      'bitsentry-desktop-ce://oauth/callback',
+    )
+    const handlers = createDesktopErrorSourcesHandlers(db, {
+      OauthManagerService: oauthBindings.OauthManagerService,
+      pluginRuntime: runtime,
+    })
+
+    await expect(
+      handlers['errorSources:create']?.({
+        pluginId: 'posthog',
+        sourceType: 'posthog',
+        name: 'Production PostHog',
+        setupValues: {
+          accessToken: 'phx-token',
+        },
+        organizationId: 'org-1',
+        projectIds: ['177710'],
+        baseUrl: 'https://eu.posthog.com',
+        syncEnabled: false,
+        autoDiagnosisEnabled: true,
+      }),
+    ).resolves.toMatchObject({
+      pluginId: 'posthog',
+      sourceType: 'posthog',
+      name: 'Production PostHog',
+      syncEnabled: false,
+      autoDiagnosisEnabled: true,
+      configuration: {
+        baseUrl: 'https://eu.posthog.com',
+        orgSlug: 'org-1',
+        projectIds: ['177710'],
+      },
+    })
+
+    expect(runtime.executeActionMock).not.toHaveBeenCalled()
+
+    const createCall = create.mock.calls[0]?.[0]
+    expect(createCall).toBeDefined()
+    expect(createCall?.data).toMatchObject({
+      sourceType: 'posthog',
+      name: 'Production PostHog',
+      accessTokenRef: 'phx-token',
+      syncEnabled: false,
+      autoDiagnosisEnabled: true,
+    })
+    expect(JSON.parse(String(createCall?.data.additionalMetadata))).toEqual({
+      pluginId: 'posthog',
+    })
+    expect(JSON.parse(String(createCall?.data.configuration))).toEqual({
+      baseUrl: 'https://eu.posthog.com',
+      orgSlug: 'org-1',
+      projectIds: ['177710'],
     })
   })
 })
