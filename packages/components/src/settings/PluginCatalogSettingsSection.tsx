@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle2, Loader2, PlugZap } from "lucide-react";
 
 import type {
@@ -32,6 +32,9 @@ interface PluginCatalogSettingsSectionProps {
   id?: string;
   className?: string;
 }
+
+const EMPTY_PLUGINS: PluginDescriptor[] = [];
+const EMPTY_STORED_AUTH_VALUES: Record<string, unknown> = {};
 
 function riskBadgeClassName(riskLevel: PluginActionDefinition["riskLevel"]): string {
   if (riskLevel === "write") {
@@ -94,6 +97,14 @@ function fieldEnumHint(field: PluginFieldDefinition): string | undefined {
   return `Allowed values: ${field.enumValues.join(", ")}`;
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
 function parseFieldValue(field: PluginFieldDefinition, rawValue: string): unknown {
   const normalized = rawValue.trim();
 
@@ -132,9 +143,7 @@ function parseFieldValue(field: PluginFieldDefinition, rawValue: string): unknow
       return JSON.parse(rawValue);
     } catch (error) {
       throw new Error(
-        `${field.label} must be valid JSON: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `${field.label} must be valid JSON: ${errorMessage(error)}`,
       );
     }
   }
@@ -207,11 +216,17 @@ function serializeFieldValue(
   }
 
   if (field.type === "boolean") {
-    return typeof value === "boolean" ? String(value) : "";
+    if (typeof value === "boolean") {
+      return String(value);
+    }
+    return "";
   }
 
   if (field.type === "number") {
-    return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+    return "";
   }
 
   if (field.type === "string_array") {
@@ -230,7 +245,11 @@ function serializeFieldValue(
     }
   }
 
-  return typeof value === "string" ? value : "";
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return "";
 }
 
 function renderResultData(data: unknown): string {
@@ -239,6 +258,186 @@ function renderResultData(data: unknown): string {
   }
 
   return JSON.stringify(data, null, 2);
+}
+
+function fieldInputType(field: PluginFieldDefinition): string {
+  if (field.secret === true) {
+    return "password";
+  }
+
+  if (field.type === "number") {
+    return "number";
+  }
+
+  return "text";
+}
+
+function requiredFieldPlaceholder(field: PluginFieldDefinition): string {
+  if (field.required) {
+    return "Required";
+  }
+
+  return "Optional";
+}
+
+function selectValuePlaceholder(field: PluginFieldDefinition): string {
+  if (field.required) {
+    return "Select a value";
+  }
+
+  return "Optional";
+}
+
+function textInputPlaceholder(field: PluginFieldDefinition): string {
+  if (field.placeholder !== undefined) {
+    return field.placeholder;
+  }
+
+  return requiredFieldPlaceholder(field);
+}
+
+function textAreaPlaceholder(field: PluginFieldDefinition): string {
+  if (field.placeholder !== undefined) {
+    return field.placeholder;
+  }
+
+  if (field.type === "json") {
+    return '{ "key": "value" }';
+  }
+
+  if (field.type === "string_array") {
+    return "one\nvalue\nper line";
+  }
+
+  return requiredFieldPlaceholder(field);
+}
+
+function pluginListButtonClassName(selected: boolean): string {
+  if (selected) {
+    return "border-primary/40 bg-primary/5";
+  }
+
+  return "border-border bg-card hover:border-border/80 hover:bg-accent/30";
+}
+
+function authLookupPluginId(selectedPluginId: string): string | undefined {
+  if (selectedPluginId.trim().length > 0) {
+    return selectedPluginId;
+  }
+
+  return undefined;
+}
+
+function firstPluginId(plugins: PluginDescriptor[]): string {
+  return plugins[0]?.id ?? "";
+}
+
+function firstActionId(plugin: PluginDescriptor): string {
+  return plugin.actions[0]?.id ?? "";
+}
+
+function selectedPluginFromCatalog(
+  plugins: PluginDescriptor[],
+  selectedPluginId: string,
+): PluginDescriptor | null {
+  const plugin = plugins.find((candidate) => candidate.id === selectedPluginId);
+  if (plugin !== undefined) {
+    return plugin;
+  }
+
+  return plugins[0] ?? null;
+}
+
+function selectedActionFromPlugin(
+  selectedPlugin: PluginDescriptor | null,
+  selectedActionId: string,
+): PluginActionDefinition | null {
+  if (selectedPlugin === null) {
+    return null;
+  }
+
+  const action = selectedPlugin.actions.find(
+    (candidate) => candidate.id === selectedActionId,
+  );
+  if (action !== undefined) {
+    return action;
+  }
+
+  return selectedPlugin.actions[0] ?? null;
+}
+
+function inputDefaultValuesForAction(
+  selectedAction: PluginActionDefinition | null,
+): Record<string, unknown> {
+  if (selectedAction === null) {
+    return {};
+  }
+
+  return fieldDefaultValueMap(selectedAction.fields);
+}
+
+function inputValuesForAction(
+  selectedAction: PluginActionDefinition | null,
+): Record<string, string> {
+  if (selectedAction === null) {
+    return {};
+  }
+
+  return mergeRawFieldValues(
+    selectedAction.fields,
+    {},
+    inputDefaultValuesForAction(selectedAction),
+  );
+}
+
+function savedAuthStatusText({
+  loading,
+  storedAuthValues,
+}: {
+  loading: boolean;
+  storedAuthValues: Record<string, unknown>;
+}): string {
+  if (loading) {
+    return "Loading saved plugin auth...";
+  }
+
+  if (Object.keys(storedAuthValues).length > 0) {
+    return "Saved auth is available for this plugin.";
+  }
+
+  return "No saved auth for this plugin yet.";
+}
+
+function savedAuthResultMessage(normalized: Record<string, unknown>): string {
+  if (Object.keys(normalized).length > 0) {
+    return "Saved plugin authentication for reuse in the desktop runtime.";
+  }
+
+  return "Cleared saved plugin authentication.";
+}
+
+function pendingLabel({
+  pending,
+  pendingText,
+  idleText,
+}: {
+  pending: boolean;
+  pendingText: string;
+  idleText: string;
+}): string {
+  if (pending) {
+    return pendingText;
+  }
+
+  return idleText;
+}
+
+function pluginCatalogErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Failed to load desktop plugins.";
 }
 
 function FieldInput({
@@ -260,15 +459,12 @@ function FieldInput({
   let input = (
     <Input
       id={inputId}
-      type={field.secret === true ? "password" : field.type === "number" ? "number" : "text"}
+      type={fieldInputType(field)}
       value={value}
       onChange={(event) => {
         onChange(event.target.value);
       }}
-      placeholder={
-        field.placeholder ??
-        (field.required ? "Required" : "Optional")
-      }
+      placeholder={textInputPlaceholder(field)}
     />
   );
 
@@ -276,7 +472,7 @@ function FieldInput({
     input = (
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger id={inputId}>
-          <SelectValue placeholder={field.required ? "Select a value" : "Optional"} />
+          <SelectValue placeholder={selectValuePlaceholder(field)} />
         </SelectTrigger>
         <SelectContent>
           {!field.required && <SelectItem value="">Unset</SelectItem>}
@@ -289,7 +485,7 @@ function FieldInput({
     input = (
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger id={inputId}>
-          <SelectValue placeholder={field.required ? "Select a value" : "Optional"} />
+          <SelectValue placeholder={selectValuePlaceholder(field)} />
         </SelectTrigger>
         <SelectContent>
           {!field.required && <SelectItem value="">Unset</SelectItem>}
@@ -309,16 +505,7 @@ function FieldInput({
         onChange={(event) => {
           onChange(event.target.value);
         }}
-        placeholder={
-          field.placeholder ??
-          (field.type === "json"
-            ? '{ "key": "value" }'
-            : field.type === "string_array"
-              ? "one\nvalue\nper line"
-              : field.required
-                ? "Required"
-                : "Optional")
-        }
+        placeholder={textAreaPlaceholder(field)}
         className="min-h-24"
       />
     );
@@ -373,9 +560,7 @@ function PluginList({
             }}
             className={cn(
               "w-full rounded-xl border px-4 py-3 text-left transition-colors",
-              selected
-                ? "border-primary/40 bg-primary/5"
-                : "border-border bg-card hover:border-border/80 hover:bg-accent/30",
+              pluginListButtonClassName(selected),
             )}
           >
             <div className="flex items-start justify-between gap-3">
@@ -413,21 +598,47 @@ export function PluginCatalogSettingsSection({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [storageMessage, setStorageMessage] = useState<string | null>(null);
   const pluginsQuery = usePlugins();
-  const storedAuthQuery = usePluginStoredAuth(
-    selectedPluginId.trim().length > 0 ? selectedPluginId : undefined,
-  );
+  const storedAuthQuery = usePluginStoredAuth(authLookupPluginId(selectedPluginId));
   const executeActionMutation = useExecutePluginAction();
   const updateStoredAuthMutation = useUpdatePluginStoredAuth();
   const clearStoredAuthMutation = useClearPluginStoredAuth();
 
-  const plugins = pluginsQuery.data ?? [];
-  const storedAuthValues = storedAuthQuery.data ?? {};
-  const selectedPlugin =
-    plugins.find((plugin) => plugin.id === selectedPluginId) ?? plugins[0] ?? null;
-  const selectedAction =
-    selectedPlugin?.actions.find((action) => action.id === selectedActionId) ??
-    selectedPlugin?.actions[0] ??
-    null;
+  const plugins = pluginsQuery.data ?? EMPTY_PLUGINS;
+  const storedAuthValues = storedAuthQuery.data ?? EMPTY_STORED_AUTH_VALUES;
+  const selectedPlugin = selectedPluginFromCatalog(plugins, selectedPluginId);
+  const selectedAction = selectedActionFromPlugin(
+    selectedPlugin,
+    selectedActionId,
+  );
+  const storedAuthStatus = savedAuthStatusText({
+    loading: storedAuthQuery.isLoading,
+    storedAuthValues,
+  });
+  const clearAuthButtonLabel = pendingLabel({
+    pending: clearStoredAuthMutation.isPending,
+    pendingText: "Clearing...",
+    idleText: "Clear saved auth",
+  });
+  const saveAuthButtonLabel = pendingLabel({
+    pending: updateStoredAuthMutation.isPending,
+    pendingText: "Saving...",
+    idleText: "Save auth",
+  });
+  let executeButtonContent: ReactNode = "Execute action";
+  if (executeActionMutation.isPending) {
+    executeButtonContent = (
+      <>
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        Executing...
+      </>
+    );
+  }
+  let executionResultVariant: "default" | "destructive" = "destructive";
+  let executionResultIcon = <AlertCircle className="h-4 w-4" />;
+  if (executeActionMutation.data?.ok === true) {
+    executionResultVariant = "default";
+    executionResultIcon = <CheckCircle2 className="h-4 w-4" />;
+  }
 
   useEffect(() => {
     if (plugins.length === 0) {
@@ -438,7 +649,7 @@ export function PluginCatalogSettingsSection({
     }
 
     if (selectedPlugin === null) {
-      setSelectedPluginId(plugins[0]?.id ?? "");
+      setSelectedPluginId(firstPluginId(plugins));
     }
   }, [plugins, selectedPlugin, selectedPluginId]);
 
@@ -451,7 +662,7 @@ export function PluginCatalogSettingsSection({
     }
 
     if (selectedAction === null) {
-      setSelectedActionId(selectedPlugin.actions[0]?.id ?? "");
+      setSelectedActionId(firstActionId(selectedPlugin));
     }
   }, [selectedAction, selectedActionId, selectedPlugin]);
 
@@ -470,13 +681,7 @@ export function PluginCatalogSettingsSection({
   }, [selectedPlugin, storedAuthValues]);
 
   useEffect(() => {
-    const defaultValues =
-      selectedAction === null ? {} : fieldDefaultValueMap(selectedAction.fields);
-    setInputValues(() =>
-      selectedAction === null
-        ? {}
-        : mergeRawFieldValues(selectedAction.fields, {}, defaultValues),
-    );
+    setInputValues(() => inputValuesForAction(selectedAction));
     setValidationError(null);
     setStorageMessage(null);
     executeActionMutation.reset();
@@ -495,13 +700,9 @@ export function PluginCatalogSettingsSection({
         pluginId: selectedPlugin.id,
         auth: normalized,
       });
-      setStorageMessage(
-        Object.keys(normalized).length > 0
-          ? "Saved plugin authentication for reuse in the desktop runtime."
-          : "Cleared saved plugin authentication.",
-      );
+      setStorageMessage(savedAuthResultMessage(normalized));
     } catch (error) {
-      setStorageMessage(error instanceof Error ? error.message : String(error));
+      setStorageMessage(errorMessage(error));
     }
   }
 
@@ -523,7 +724,7 @@ export function PluginCatalogSettingsSection({
       );
       setStorageMessage("Cleared saved plugin authentication.");
     } catch (error) {
-      setStorageMessage(error instanceof Error ? error.message : String(error));
+      setStorageMessage(errorMessage(error));
     }
   }
 
@@ -556,7 +757,7 @@ export function PluginCatalogSettingsSection({
         input,
       });
     } catch (error) {
-      setValidationError(error instanceof Error ? error.message : String(error));
+      setValidationError(errorMessage(error));
     }
   }
 
@@ -593,9 +794,7 @@ export function PluginCatalogSettingsSection({
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Plugin catalog unavailable</AlertTitle>
                 <AlertDescription>
-                  {pluginsQuery.error instanceof Error
-                    ? pluginsQuery.error.message
-                    : "Failed to load desktop plugins."}
+                  {pluginCatalogErrorMessage(pluginsQuery.error)}
                 </AlertDescription>
               </Alert>
             )}
@@ -676,11 +875,7 @@ export function PluginCatalogSettingsSection({
                       </div>
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
                         <div className="text-xs text-muted-foreground">
-                          {storedAuthQuery.isLoading
-                            ? "Loading saved plugin auth..."
-                            : Object.keys(storedAuthValues).length > 0
-                              ? "Saved auth is available for this plugin."
-                              : "No saved auth for this plugin yet."}
+                          {storedAuthStatus}
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <Button
@@ -694,7 +889,7 @@ export function PluginCatalogSettingsSection({
                               clearStoredAuthMutation.isPending
                             }
                           >
-                            {clearStoredAuthMutation.isPending ? "Clearing..." : "Clear saved auth"}
+                            {clearAuthButtonLabel}
                           </Button>
                           <Button
                             type="button"
@@ -707,7 +902,7 @@ export function PluginCatalogSettingsSection({
                               updateStoredAuthMutation.isPending
                             }
                           >
-                            {updateStoredAuthMutation.isPending ? "Saving..." : "Save auth"}
+                            {saveAuthButtonLabel}
                           </Button>
                         </div>
                       </div>
@@ -828,14 +1023,7 @@ export function PluginCatalogSettingsSection({
                               }}
                               disabled={executeActionMutation.isPending}
                             >
-                              {executeActionMutation.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Executing...
-                                </>
-                              ) : (
-                                "Execute action"
-                              )}
+                              {executeButtonContent}
                             </Button>
                           </div>
                         </div>
@@ -851,14 +1039,8 @@ export function PluginCatalogSettingsSection({
                     )}
 
                     {executeActionMutation.data !== undefined && (
-                      <Alert
-                        variant={executeActionMutation.data.ok ? "default" : "destructive"}
-                      >
-                        {executeActionMutation.data.ok ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4" />
-                        )}
+                      <Alert variant={executionResultVariant}>
+                        {executionResultIcon}
                         <AlertTitle>
                           {executeActionMutation.data.actionId} returned status{" "}
                           {executeActionMutation.data.status}
