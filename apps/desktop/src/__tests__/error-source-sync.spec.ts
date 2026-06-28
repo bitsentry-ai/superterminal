@@ -3,11 +3,13 @@ import {
   SqliteErrorSourcesRepositoryAdapter,
   type ErrorSourceDatabase,
 } from '@bitsentry-ce/core/features/error-sources/desktop-sqlite-error-sources.adapter'
-import { SentryProviderAdapter } from '@bitsentry-ce/core/features/error-sources/desktop-sentry-provider.adapter'
+import { ErrorSourceProviderFactory } from '@bitsentry-ce/core/features/error-sources'
 import { ErrorSourceSyncService } from '@bitsentry-ce/core/features/error-sources/desktop-error-source-sync.service'
 import type { ErrorSourceProvider } from '@bitsentry-ce/core/features/error-sources/desktop-error-source-provider.interface'
 import type { UpsertErrorIssueInput } from '@bitsentry-ce/core/features/error-sources/desktop-sqlite-error-issues.adapter'
 import type { ErrorIssue, ErrorSource } from '@bitsentry-ce/core/features/error-sources/desktop-error-sources.types'
+import { createDesktopNodePluginRuntimeService } from '@bitsentry-ce/core/features/plugins/node'
+import path from 'path'
 
 function makeSource(overrides: Partial<ErrorSource> = {}): ErrorSource {
   return {
@@ -176,7 +178,10 @@ describe('Sentry external source sync', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const provider = new SentryProviderAdapter()
+    const pluginDirectory = path.resolve(process.cwd(), '../../packages/plugins')
+    const provider = new ErrorSourceProviderFactory(
+      createDesktopNodePluginRuntimeService([pluginDirectory]),
+    ).getProvider('sentry')
     await provider.listIssues({
       accessToken: 'token',
       orgSlug: 'jagad',
