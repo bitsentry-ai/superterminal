@@ -3,10 +3,6 @@ import { createHash, randomBytes } from "crypto";
 import type { ErrorSourceType } from "./error-sources.schemas";
 import { getProviderForSource } from "./desktop-posthog-provider-binding";
 import { assertAllowedPostHogBaseUrl } from "./posthog-base-url";
-import {
-  isOAuthPluginErrorSourceType,
-  type OAuthPluginErrorSourceType,
-} from "./plugin-backed-error-sources";
 
 export interface DesktopOAuthSettingsDatabase {
   setting: {
@@ -94,11 +90,20 @@ type PendingOauthState = {
   providerBaseUrl?: string;
 };
 
-export type OAuthSourceType = OAuthPluginErrorSourceType;
+export type OAuthSourceType = ErrorSourceType;
+export type OAuthProviderConfigMap = Partial<
+  Record<OAuthSourceType, OAuthProviderConfig>
+>;
+export type BuiltInOAuthSourceType = "sentry" | "posthog";
+export type BuiltInOAuthProviderConfigMap = Record<
+  BuiltInOAuthSourceType,
+  OAuthProviderConfig
+> &
+  OAuthProviderConfigMap;
 
 export function createDesktopOAuthProviderConfigs(
   defaultRedirectUri: string,
-): Record<OAuthSourceType, OAuthProviderConfig> {
+): BuiltInOAuthProviderConfigMap {
   return {
     sentry: {
       envClientIdName: "SENTRY_OAUTH_CLIENT_ID",
@@ -146,6 +151,66 @@ function getRequiredEnv(name: string, sourceType: string): string {
     throw new Error(`${name} is required for ${sourceType} OAuth`);
   }
   return value;
+}
+
+function readMissingOAuthProviderConfigKeys(
+  config: Partial<OAuthProviderConfig>,
+): string[] {
+  const missing: string[] = [];
+
+  if (typeof config.envClientIdName !== "string" || config.envClientIdName.trim().length === 0) {
+    missing.push("envClientIdName");
+  }
+  if (typeof config.envClientSecretName !== "string" || config.envClientSecretName.trim().length === 0) {
+    missing.push("envClientSecretName");
+  }
+  if (typeof config.envRedirectUriName !== "string" || config.envRedirectUriName.trim().length === 0) {
+    missing.push("envRedirectUriName");
+  }
+  if (typeof config.defaultRedirectUri !== "string" || config.defaultRedirectUri.trim().length === 0) {
+    missing.push("defaultRedirectUri");
+  }
+  if (!Array.isArray(config.scopes) || config.scopes.length === 0) {
+    missing.push("scopes");
+  }
+  if (typeof config.publicClient !== "boolean") {
+    missing.push("publicClient");
+  }
+
+  return missing;
+}
+
+function mergeOAuthProviderConfig(input: {
+  sourceType: ErrorSourceType;
+  baseConfig?: OAuthProviderConfig;
+  pluginOverrides?: Partial<OAuthProviderConfig>;
+}): OAuthProviderConfig {
+  if (input.baseConfig === undefined && input.pluginOverrides === undefined) {
+    throw new Error(
+      `OAuth is not configured for source type: ${input.sourceType}`,
+    );
+  }
+
+  const merged: Partial<OAuthProviderConfig> = {
+    ...(input.baseConfig ?? {}),
+    ...(input.pluginOverrides ?? {}),
+  };
+  const missingKeys = readMissingOAuthProviderConfigKeys(merged);
+  if (missingKeys.length > 0) {
+    throw new Error(
+      `OAuth config for source type "${input.sourceType}" is incomplete. Missing: ${missingKeys.join(", ")}`,
+    );
+  }
+
+  const config = merged as OAuthProviderConfig;
+  return {
+    envClientIdName: config.envClientIdName,
+    envClientSecretName: config.envClientSecretName,
+    envRedirectUriName: config.envRedirectUriName,
+    defaultRedirectUri: config.defaultRedirectUri,
+    scopes: config.scopes,
+    publicClient: config.publicClient,
+  };
 }
 
 function isExpired(createdAt: string): boolean {
@@ -249,7 +314,7 @@ async function openExternalUrl(url: string): Promise<void> {
 }
 
 export interface DesktopOauthManagerOptions {
-  providerConfigs: Record<OAuthSourceType, OAuthProviderConfig>;
+  providerConfigs: OAuthProviderConfigMap;
   resolveProvider(input: {
     sourceType: ErrorSourceType;
     pluginId?: string;
@@ -289,7 +354,7 @@ export interface DesktopOauthManagerProviderFactory {
 }
 
 export interface DesktopOauthManagerBindings {
-  providerConfigs: Record<OAuthSourceType, OAuthProviderConfig>;
+  providerConfigs: BuiltInOAuthProviderConfigMap;
   OauthManagerService: new (
     db: DesktopOAuthSettingsDatabase,
     providerFactory: DesktopOauthManagerProviderFactory,
@@ -369,28 +434,14 @@ export class DesktopOauthManagerService {
     sourceType: ErrorSourceType,
     pluginId?: string,
   ): OAuthProviderConfig {
-    if (!isOAuthPluginErrorSourceType(sourceType)) {
-      throw new Error(`OAuth is not configured for source type: ${sourceType}`);
-    }
-
     const baseConfig = this.options.providerConfigs[sourceType];
     const pluginOverrides = this.getPluginProviderConfig(sourceType, pluginId);
-    if (pluginOverrides === undefined) {
-      return baseConfig;
-    }
 
-    return {
-      envClientIdName:
-        pluginOverrides.envClientIdName ?? baseConfig.envClientIdName,
-      envClientSecretName:
-        pluginOverrides.envClientSecretName ?? baseConfig.envClientSecretName,
-      envRedirectUriName:
-        pluginOverrides.envRedirectUriName ?? baseConfig.envRedirectUriName,
-      defaultRedirectUri:
-        pluginOverrides.defaultRedirectUri ?? baseConfig.defaultRedirectUri,
-      scopes: pluginOverrides.scopes ?? baseConfig.scopes,
-      publicClient: pluginOverrides.publicClient ?? baseConfig.publicClient,
-    };
+    return mergeOAuthProviderConfig({
+      sourceType,
+      baseConfig,
+      pluginOverrides,
+    });
   }
 
   private getProviderForOAuth(

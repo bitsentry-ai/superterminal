@@ -30,6 +30,7 @@ import {
   PROVIDER_CONFIGS,
 } from '../main/features/error-sources/services/oauth-manager.service'
 import type { DbClient } from '@bitsentry-ce/core/features/desktop/desktop-database-client'
+import type { DesktopOauthManagerProviderFactory } from '@bitsentry-ce/core/features/error-sources/desktop-oauth-manager'
 import {
   DesktopPluginRuntimeService,
   type DesktopPluginExecutionRequest,
@@ -366,6 +367,75 @@ describe('posthog error source support', () => {
     expect(refreshUrl).toBe('https://eu.posthog.com/oauth/token/')
     expect(refreshRequestInit?.method).toBe('POST')
     expect(requestBodyText(refreshRequestInit?.body)).toContain('grant_type=refresh_token')
+  })
+
+  it('starts OAuth for non-built-in code plugin source types', async () => {
+    const upsertSetting = vi.fn<DbClient['setting']['upsert']>().mockResolvedValue({})
+    const db = {
+      setting: {
+        findMany: vi.fn().mockResolvedValue([]),
+        upsert: upsertSetting,
+        findUnique: vi.fn().mockResolvedValue(null),
+        delete: vi.fn().mockResolvedValue({}),
+      },
+    }
+    const provider = {
+      buildAuthorizeUrl: vi.fn(() => 'https://github.com/login/oauth/authorize?state=state-1'),
+      exchangeCodeForToken: vi.fn(),
+    }
+    const providerFactory: DesktopOauthManagerProviderFactory = {
+      getProvider: vi.fn(() => provider),
+      getProviderForSource: vi.fn(() => provider),
+      getPlugin: vi.fn((pluginId: string) => {
+        if (pluginId !== 'github') return null
+
+        return {
+          metadata: {
+            errorSource: {
+              sourceType: 'github',
+              oauth: {
+                envClientIdName: 'GITHUB_OAUTH_CLIENT_ID',
+                envClientSecretName: 'GITHUB_OAUTH_CLIENT_SECRET',
+                envRedirectUriName: 'GITHUB_OAUTH_REDIRECT_URI',
+                defaultRedirectUri: 'bitsentry-desktop-ce://oauth/callback',
+                scopes: ['repo'],
+                publicClient: false,
+              },
+            },
+          },
+        }
+      }),
+    }
+    const manager = new OauthManagerService(
+      db,
+      providerFactory,
+    )
+
+    const initiated = await manager.initiateOAuth('github', {
+      pluginId: 'github',
+      clientId: 'client-id',
+    })
+
+    expect(initiated.authUrl).toBe('https://github.com/login/oauth/authorize?state=state-1')
+    expect(providerFactory.getProviderForSource).toHaveBeenCalledWith({
+      sourceType: 'github',
+      additionalMetadata: { pluginId: 'github' },
+      configuration: {
+        posthogBaseUrl: undefined,
+      },
+    })
+    expect(provider.buildAuthorizeUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientId: 'client-id',
+        redirectUri: 'bitsentry-desktop-ce://oauth/callback',
+        scopes: ['repo'],
+      }),
+    )
+    const upsertInput = upsertSetting.mock.calls[0][0]
+    expect(JSON.parse(String(upsertInput.create.value))).toMatchObject({
+      sourceType: 'github',
+      pluginId: 'github',
+    })
   })
 
   it('preserves the selected PostHog base URL across OAuth state and token exchange', async () => {

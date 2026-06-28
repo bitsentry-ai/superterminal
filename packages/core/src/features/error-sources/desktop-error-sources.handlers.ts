@@ -28,13 +28,8 @@ import type {
 import {
   createDesktopNodePluginRuntimeService,
 } from '../plugins/node'
-import {
-  OAUTH_PLUGIN_ERROR_SOURCE_TYPES,
-} from './plugin-backed-error-sources'
 import { resolveErrorSourceProviderActionId } from './desktop-plugin-error-source-actions'
 
-const SUPPORTED_OAUTH_SOURCE_TYPES: ReadonlyArray<ErrorSourceType> =
-  OAUTH_PLUGIN_ERROR_SOURCE_TYPES
 const POSTHOG_PROJECT_SCOPED_API_KEY_MESSAGE =
   'This PostHog API key is scoped to specific projects. Add at least one numeric Project ID so BitSentry can use PostHog project-based endpoints.'
 const POSTHOG_PROJECT_SCOPED_ENDPOINT_ERROR =
@@ -88,7 +83,7 @@ type UpdateErrorSourcePayload = z.infer<typeof updateErrorSourcePayloadSchema>
 const initiateOAuthPayloadSchema = z
   .object({
     pluginId: z.string().optional(),
-    sourceType: z.enum(OAUTH_PLUGIN_ERROR_SOURCE_TYPES).optional().default('sentry'),
+    sourceType: errorSourceTypeSchema.optional(),
     setupValues: handlerPayloadSchema.optional(),
     clientId: z.string().optional(),
     redirectUri: z.string().optional(),
@@ -96,12 +91,12 @@ const initiateOAuthPayloadSchema = z
     posthogBaseUrl: z.string().optional(),
   })
   .optional()
-  .default({ sourceType: 'sentry' })
+  .default({})
 type InitiateOAuthPayload = z.infer<typeof initiateOAuthPayloadSchema>
 const completeOAuthPayloadSchema = z
   .object({
     pluginId: z.string().optional(),
-    sourceType: z.enum(OAUTH_PLUGIN_ERROR_SOURCE_TYPES).optional().default('sentry'),
+    sourceType: errorSourceTypeSchema.optional(),
     setupValues: handlerPayloadSchema.optional(),
     code: z.string().min(1),
     state: z.string().min(1),
@@ -315,6 +310,15 @@ function readSourceType(value: unknown): ErrorSourceType | null {
   }
 
   return null
+}
+
+function readRequiredSourceType(value: unknown, label: string): ErrorSourceType {
+  const sourceType = readSourceType(value)
+  if (sourceType === null) {
+    throw new Error(`${label} requires a sourceType`)
+  }
+
+  return sourceType
 }
 
 function readPluginId(value: unknown): string | undefined {
@@ -661,14 +665,6 @@ function isMissingPluginAuthError(error: unknown): boolean {
 
 function isPostHogProjectScopedEndpointError(error: unknown): boolean {
   return error instanceof Error && error.message.includes(POSTHOG_PROJECT_SCOPED_ENDPOINT_ERROR)
-}
-
-function isSupportedOAuthType(value: unknown): value is ErrorSourceType {
-  if (typeof value !== 'string') {
-    return false
-  }
-
-  return SUPPORTED_OAUTH_SOURCE_TYPES.some((sourceType) => sourceType === value)
 }
 
 function normalizePostHogBaseUrl(value: unknown): string {
@@ -1482,12 +1478,15 @@ export function createDesktopErrorSourcesHandlers(
 
     'errorSources:initiateOAuth': async (rawPayload: unknown) => {
       const payload = readInitiateOAuthPayload(rawPayload)
-      const sourceType = payload.sourceType
-      const pluginId = readPluginId(payload.pluginId)
+      const sourceType = readRequiredSourceType(
+        payload.sourceType,
+        'OAuth initiation',
+      )
+      const pluginId = readPluginId(payload.pluginId) ?? sourceType
       const setupValues = readPayloadRecord(payload.setupValues) ?? {}
       const persistedSetup = resolvePersistedPluginSetup(
         pluginRuntime,
-        pluginId ?? sourceType,
+        pluginId,
         setupValues,
       )
       const oauthConfigOverrides = readOAuthConfigurationOverrides(
@@ -1515,7 +1514,10 @@ export function createDesktopErrorSourcesHandlers(
     // eslint-disable-next-line sonarjs/cognitive-complexity -- OAuth completion handles provider-specific org/project binding after token exchange.
     'errorSources:completeOAuth': async (rawPayload: unknown) => {
       const payload = readCompleteOAuthPayload(rawPayload)
-      const sourceType = payload.sourceType
+      const sourceType = readRequiredSourceType(
+        payload.sourceType,
+        'OAuth completion',
+      )
       const code = payload.code.trim()
       const state = payload.state.trim()
       const pluginId = readPluginId(payload.pluginId) ?? sourceType
