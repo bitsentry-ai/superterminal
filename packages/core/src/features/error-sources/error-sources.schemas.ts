@@ -1,7 +1,4 @@
 import { z } from 'zod';
-import {
-  OAUTH_PLUGIN_ERROR_SOURCE_TYPES,
-} from './plugin-backed-error-sources';
 
 export const errorSourceTypeSchema = z.string().trim().min(1);
 export type ErrorSourceType = z.infer<typeof errorSourceTypeSchema>;
@@ -94,12 +91,13 @@ export const testErrorSourceConnectionResultSchema = z.object({
  * against a provider's listOrganizations / listProjects endpoints so the UI
  * can render org/project pickers without forcing the user to type slugs.
  *
- * Wazuh is intentionally excluded: it has no org/project concept and a
- * universal probe over an unknown index pattern would behave very differently
- * from the sentry/posthog flow.
+ * The source type is intentionally open-ended: installed code plugins decide
+ * whether probing is supported by declaring listOrganizations/listProjects
+ * provider actions.
  */
 export const probeErrorSourceSchema = z.object({
-  sourceType: z.enum(OAUTH_PLUGIN_ERROR_SOURCE_TYPES),
+  pluginId: z.string().trim().min(1).optional(),
+  sourceType: errorSourceTypeSchema,
   authToken: z.string().trim().min(1),
   baseUrl: z.url().optional(),
   /**

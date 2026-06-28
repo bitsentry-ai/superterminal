@@ -309,8 +309,9 @@ function readRequiredTrimmed(value: unknown, label: string): string {
 }
 
 function readSourceType(value: unknown): ErrorSourceType | null {
-  if (value === 'sentry' || value === 'posthog') {
-    return value
+  const normalized = readOptionalTrimmed(value)
+  if (normalized !== undefined) {
+    return normalized
   }
 
   return null
@@ -756,15 +757,20 @@ export function createDesktopErrorSourcesHandlers(
 
     return orgs.filter((org) => org.slug === requestedOrgSlug)
   }
+
+  function useProjectSlugForProbe(pluginId: string): boolean {
+    const fields =
+      pluginRuntime.getPlugin(pluginId)?.metadata?.errorSource?.setupFields ?? []
+    return fields.some((field) => field.target === 'projectSlugs')
+  }
+
   return {
 
     'errorSources:probeConnection': async (rawPayload: unknown) => {
       const payload = readHandlerPayload(rawPayload)
       const sourceType = readSourceType(payload.sourceType)
       if (sourceType === null) {
-        throw new Error(
-          'Probe is only supported for sentry and posthog sources',
-        )
+        throw new Error('Probe requires a sourceType')
       }
 
       const authToken = readRequiredTrimmed(payload.authToken, 'authToken')
@@ -785,49 +791,18 @@ export function createDesktopErrorSourcesHandlers(
       )
 
       try {
-        if (sourceType === 'sentry') {
-          const provider = getProviderForSource(providerFactory, {
-            sourceType,
-            additionalMetadata: { pluginId },
-          })
-          const orgs = await provider.listOrganizations(authToken)
-          const visibleOrgs = filterProbeOrganizations(orgs, requestedOrgSlug)
-
-          const organizations: ProbeOrg[] = visibleOrgs.map((org) => ({
-            id: org.slug,
-            name: org.name,
-          }))
-
-          const projects: ProbeProject[] = []
-          for (const org of visibleOrgs) {
-            const orgProjects = await provider.listProjects({
-              accessToken: authToken,
-              orgSlug: org.slug,
-            })
-            for (const project of orgProjects) {
-              projects.push({
-                id: project.slug,
-                name: project.name,
-                orgId: org.slug,
-              })
-            }
-          }
-
-          log.info(
-            `[error-sources] probeConnection:success type=sentry orgs=${String(organizations.length)} projects=${String(projects.length)}`,
-          )
-          return { organizations, projects }
+        let probeConfiguration: { posthogBaseUrl: string } | undefined
+        if (baseUrl !== undefined) {
+          probeConfiguration = { posthogBaseUrl: baseUrl }
         }
-
-        // posthog
-        const validatedBaseUrl = validatePostHogBaseUrl(baseUrl)
         const provider = getProviderForSource(providerFactory, {
           sourceType,
           additionalMetadata: { pluginId },
-          configuration: { posthogBaseUrl: validatedBaseUrl },
+          configuration: probeConfiguration,
         })
         const orgs = await provider.listOrganizations(authToken)
         const visibleOrgs = filterProbeOrganizations(orgs, requestedOrgSlug)
+        const projectIdFieldUsesSlug = useProjectSlugForProbe(pluginId)
 
         const organizations: ProbeOrg[] = visibleOrgs.map((org) => ({
           id: org.slug,
@@ -841,8 +816,12 @@ export function createDesktopErrorSourcesHandlers(
             orgSlug: org.slug,
           })
           for (const project of orgProjects) {
+            let projectId = project.id
+            if (projectIdFieldUsesSlug) {
+              projectId = project.slug
+            }
             projects.push({
-              id: project.id,
+              id: projectId,
               name: project.name,
               orgId: org.slug,
             })
@@ -850,7 +829,7 @@ export function createDesktopErrorSourcesHandlers(
         }
 
         log.info(
-          `[error-sources] probeConnection:success type=posthog orgs=${String(organizations.length)} projects=${String(projects.length)}`,
+          `[error-sources] probeConnection:success type=${sourceType} orgs=${String(organizations.length)} projects=${String(projects.length)}`,
         )
         return { organizations, projects }
       } catch (error) {
