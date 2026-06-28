@@ -2,6 +2,9 @@ import type { ErrorSourceType } from "./desktop-error-sources.types";
 import type { DesktopPluginRuntimeService } from "../plugins";
 
 export type ErrorSourceProviderActionKey =
+  | "buildAuthorizeUrl"
+  | "exchangeCodeForToken"
+  | "refreshToken"
   | "listOrganizations"
   | "listProjects"
   | "getProject"

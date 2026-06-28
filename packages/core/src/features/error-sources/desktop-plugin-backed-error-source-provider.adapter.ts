@@ -16,27 +16,11 @@ import type {
   ProjectSummary,
 } from "./desktop-error-source-provider.interface";
 
-type ErrorSourceOauthDelegate = Pick<
-  ErrorSourceProvider,
-  | "buildAuthorizeUrl"
-  | "exchangeCodeForToken"
-  | "refreshToken"
->;
-
-type ErrorSourceOauthDelegateFactoryInput = {
-  baseUrl?: string;
-};
-
-export type ErrorSourceOauthDelegateFactory = (
-  input: ErrorSourceOauthDelegateFactoryInput,
-) => ErrorSourceOauthDelegate;
-
 type PluginBackedErrorSourceProviderOptions = {
   runtime?: DesktopPluginRuntimeService;
   pluginId: string;
   sourceType: ErrorSourceType;
   baseUrl?: string;
-  createOauthDelegate?: ErrorSourceOauthDelegateFactory;
 };
 
 const organizationSummarySchema = z.object({
@@ -61,6 +45,17 @@ const eventBatchResponseSchema = z.object({
   events: z.array(z.record(z.string(), z.unknown())),
   nextCursor: z.string().optional(),
   hasMore: z.boolean(),
+});
+
+const oauthAuthorizeUrlResponseSchema = z.object({
+  authUrl: z.string().min(1),
+});
+
+const oauthTokenResponseSchema = z.object({
+  accessToken: z.string().min(1),
+  refreshToken: z.string().optional(),
+  expiresIn: z.number().optional(),
+  scope: z.string().optional(),
 });
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -121,17 +116,6 @@ function normalizeProjectSummary(value: unknown): ProjectSummary {
   });
 }
 
-function requireOauthDelegate(
-  sourceType: ErrorSourceType,
-  oauthDelegate?: ErrorSourceOauthDelegate,
-): ErrorSourceOauthDelegate {
-  if (oauthDelegate === undefined) {
-    throw new Error(`OAuth is not configured for plugin source type: ${sourceType}`);
-  }
-
-  return oauthDelegate;
-}
-
 export class PluginBackedErrorSourceProviderAdapter
   implements ErrorSourceProvider
 {
@@ -143,19 +127,11 @@ export class PluginBackedErrorSourceProviderAdapter
 
   private readonly baseUrl?: string;
 
-  private readonly createOauthDelegate?: ErrorSourceOauthDelegateFactory;
-
-  private readonly oauthDelegateInstance?: ErrorSourceOauthDelegate;
-
   constructor(options: PluginBackedErrorSourceProviderOptions) {
     this.runtime = options.runtime ?? createDesktopNodePluginRuntimeService();
     this.pluginId = options.pluginId;
     this.sourceType = options.sourceType;
     this.baseUrl = options.baseUrl;
-    this.createOauthDelegate = options.createOauthDelegate;
-    this.oauthDelegateInstance = options.createOauthDelegate?.({
-      baseUrl: options.baseUrl,
-    });
   }
 
   withApiBase(
@@ -171,22 +147,62 @@ export class PluginBackedErrorSourceProviderAdapter
       pluginId: this.pluginId,
       sourceType: this.sourceType,
       baseUrl: nextBaseUrl,
-      createOauthDelegate: this.createOauthDelegate,
     });
   }
 
-  buildAuthorizeUrl(input: OAuthAuthorizeInput): string {
-    return this.oauthDelegate().buildAuthorizeUrl(input);
+  async buildAuthorizeUrl(input: OAuthAuthorizeInput): Promise<string> {
+    const result = await this.runtime.executeAction({
+      pluginId: this.pluginId,
+      actionId: this.readActionId("buildAuthorizeUrl"),
+      auth: this.oauthAuth(),
+      input: {
+        clientId: input.clientId,
+        redirectUri: input.redirectUri,
+        scopes: input.scopes,
+        state: input.state,
+        codeChallenge: input.codeChallenge,
+      },
+    });
+
+    return oauthAuthorizeUrlResponseSchema.parse(result.data).authUrl;
   }
 
-  exchangeCodeForToken(
+  async exchangeCodeForToken(
     input: OAuthTokenExchangeInput,
   ): Promise<OAuthTokenResponse> {
-    return this.oauthDelegate().exchangeCodeForToken(input);
+    void input.signal;
+
+    const result = await this.runtime.executeAction({
+      pluginId: this.pluginId,
+      actionId: this.readActionId("exchangeCodeForToken"),
+      auth: this.oauthAuth(),
+      input: {
+        clientId: input.clientId,
+        clientSecret: input.clientSecret,
+        code: input.code,
+        redirectUri: input.redirectUri,
+        codeVerifier: input.codeVerifier,
+      },
+    });
+
+    return oauthTokenResponseSchema.parse(result.data);
   }
 
-  refreshToken(input: OAuthTokenRefreshInput): Promise<OAuthTokenResponse> {
-    return this.oauthDelegate().refreshToken(input);
+  async refreshToken(input: OAuthTokenRefreshInput): Promise<OAuthTokenResponse> {
+    void input.signal;
+
+    const result = await this.runtime.executeAction({
+      pluginId: this.pluginId,
+      actionId: this.readActionId("refreshToken"),
+      auth: this.oauthAuth(),
+      input: {
+        clientId: input.clientId,
+        clientSecret: input.clientSecret,
+        refreshToken: input.refreshToken,
+      },
+    });
+
+    return oauthTokenResponseSchema.parse(result.data);
   }
 
   async listOrganizations(accessToken: string): Promise<OrganizationSummary[]> {
@@ -317,13 +333,6 @@ export class PluginBackedErrorSourceProviderAdapter
     return eventBatchResponseSchema.parse(result.data);
   }
 
-  private oauthDelegate(): ErrorSourceOauthDelegate {
-    return requireOauthDelegate(
-      this.sourceType,
-      this.oauthDelegateInstance,
-    );
-  }
-
   private auth(accessToken: string): Record<string, unknown> {
     const auth: Record<string, unknown> = { accessToken };
     if (this.baseUrl !== undefined && this.baseUrl.length > 0) {
@@ -333,8 +342,20 @@ export class PluginBackedErrorSourceProviderAdapter
     return auth;
   }
 
+  private oauthAuth(): Record<string, unknown> {
+    const auth: Record<string, unknown> = {};
+    if (this.baseUrl !== undefined && this.baseUrl.length > 0) {
+      auth.baseUrl = this.baseUrl;
+    }
+
+    return auth;
+  }
+
   private readActionId(
     action:
+      | "buildAuthorizeUrl"
+      | "exchangeCodeForToken"
+      | "refreshToken"
       | "listOrganizations"
       | "listProjects"
       | "getProject"

@@ -1,11 +1,6 @@
 import type { ErrorSourceType } from './desktop-error-sources.types'
 import type { ErrorSourceProvider } from './desktop-error-source-provider.interface'
-import {
-  PluginBackedErrorSourceProviderAdapter,
-  type ErrorSourceOauthDelegateFactory,
-} from './desktop-plugin-backed-error-source-provider.adapter'
-import { SentryProviderAdapter } from './desktop-sentry-provider.adapter'
-import { PostHogProviderAdapter } from './desktop-posthog-provider.adapter'
+import { PluginBackedErrorSourceProviderAdapter } from './desktop-plugin-backed-error-source-provider.adapter'
 import type { DesktopPluginDescriptor } from '../plugins/plugins.types'
 import type { DesktopPluginRuntimeService } from '../plugins/desktop-plugin-registry'
 import { createDesktopNodePluginRuntimeService } from '../plugins/desktop-plugin-runtime.node'
@@ -105,22 +100,7 @@ export class ErrorSourceProviderFactory {
       runtime: this.runtime,
       pluginId,
       sourceType,
-      createOauthDelegate: this.createOauthDelegate(sourceType),
     })
-  }
-
-  private createOauthDelegate(
-    sourceType: ErrorSourceType,
-  ): ErrorSourceOauthDelegateFactory | undefined {
-    if (sourceType === 'sentry') {
-      return () => new SentryProviderAdapter()
-    }
-
-    if (sourceType === 'posthog') {
-      return ({ baseUrl }) => new PostHogProviderAdapter({ apiBase: baseUrl })
-    }
-
-    return undefined
   }
 
   private readPluginId(additionalMetadata: unknown): string | undefined {

@@ -52,7 +52,7 @@ export interface DesktopOAuthTokenResponse {
 }
 
 export interface DesktopOAuthProvider {
-  buildAuthorizeUrl(input: DesktopOAuthAuthorizeInput): string;
+  buildAuthorizeUrl(input: DesktopOAuthAuthorizeInput): string | Promise<string>;
   exchangeCodeForToken(
     input: DesktopOAuthTokenExchangeInput,
   ): Promise<DesktopOAuthTokenResponse>;
@@ -442,7 +442,7 @@ export class DesktopOauthManagerService {
       pluginId,
       providerBaseUrl,
     );
-    const authUrl = provider.buildAuthorizeUrl({
+    const authUrl = await provider.buildAuthorizeUrl({
       clientId,
       redirectUri,
       scopes: config.scopes,

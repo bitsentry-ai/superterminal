@@ -1,4 +1,6 @@
 const SENTRY_API_BASE = "https://sentry.io/api/0";
+const SENTRY_AUTHORIZE_URL = "https://sentry.io/oauth/authorize/";
+const SENTRY_TOKEN_URL = "https://sentry.io/oauth/token/";
 const DEFAULT_ISSUES_LIMIT = 50;
 const DEFAULT_EVENTS_LIMIT = 50;
 const MAX_ISSUES_LIMIT = 100;
@@ -244,6 +246,99 @@ async function requestSentry(url, init, maxAttempts = 5) {
   throw new Error("Sentry API request failed after retries");
 }
 
+function normalizeTokenResponse(payload) {
+  const accessToken = readString(payload?.access_token);
+  if (accessToken.length === 0) {
+    throw new Error("Sentry OAuth response did not include an access token");
+  }
+
+  const response = { accessToken };
+  const refreshToken = readString(payload?.refresh_token);
+  if (refreshToken.length > 0) {
+    response.refreshToken = refreshToken;
+  }
+
+  const expiresIn = Number(payload?.expires_in);
+  if (Number.isFinite(expiresIn)) {
+    response.expiresIn = expiresIn;
+  }
+
+  const scope = readString(payload?.scope);
+  if (scope.length > 0) {
+    response.scope = scope;
+  }
+
+  return response;
+}
+
+function buildAuthorizeUrl({ input }) {
+  const url = new URL(SENTRY_AUTHORIZE_URL);
+  url.searchParams.set("client_id", requireString(input.clientId, "clientId"));
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("redirect_uri", requireString(input.redirectUri, "redirectUri"));
+  url.searchParams.set("scope", readStringArray(input.scopes).join(" "));
+  url.searchParams.set("state", requireString(input.state, "state"));
+  url.searchParams.set(
+    "code_challenge",
+    requireString(input.codeChallenge, "codeChallenge"),
+  );
+  url.searchParams.set("code_challenge_method", "S256");
+
+  return {
+    status: 200,
+    summary: "Built Sentry OAuth authorize URL.",
+    data: {
+      authUrl: url.toString(),
+    },
+  };
+}
+
+async function exchangeCodeForToken({ input }) {
+  const payload = new URLSearchParams({
+    client_id: requireString(input.clientId, "clientId"),
+    client_secret: readString(input.clientSecret),
+    grant_type: "authorization_code",
+    code: requireString(input.code, "code"),
+    redirect_uri: requireString(input.redirectUri, "redirectUri"),
+    code_verifier: requireString(input.codeVerifier, "codeVerifier"),
+  });
+  const response = await requestSentry(SENTRY_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: payload.toString(),
+  });
+
+  return {
+    status: 200,
+    summary: "Exchanged Sentry OAuth code.",
+    data: normalizeTokenResponse(await response.json()),
+  };
+}
+
+async function refreshToken({ input }) {
+  const payload = new URLSearchParams({
+    client_id: requireString(input.clientId, "clientId"),
+    client_secret: readString(input.clientSecret),
+    grant_type: "refresh_token",
+    refresh_token: requireString(input.refreshToken, "refreshToken"),
+  });
+  const response = await requestSentry(SENTRY_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: payload.toString(),
+  });
+
+  return {
+    status: 200,
+    summary: "Refreshed Sentry OAuth token.",
+    data: normalizeTokenResponse(await response.json()),
+  };
+}
+
 async function listOrganizations({ auth }) {
   const accessToken = requireString(auth.accessToken, "accessToken");
   const apiBase = readApiBase(auth);
@@ -426,6 +521,9 @@ exports.plugin = {
         },
       ],
       providerActions: {
+        buildAuthorizeUrl: "build_authorize_url",
+        exchangeCodeForToken: "exchange_code_for_token",
+        refreshToken: "refresh_token",
         listOrganizations: "list_organizations",
         listProjects: "list_projects",
         queryIssues: "query_issues",
@@ -447,7 +545,7 @@ exports.plugin = {
         key: "accessToken",
         label: "Sentry access token",
         type: "string",
-        required: true,
+        required: false,
         secret: true,
       },
       {
@@ -459,6 +557,118 @@ exports.plugin = {
     ],
   },
   actions: [
+    {
+      id: "build_authorize_url",
+      title: "Build Sentry OAuth authorize URL",
+      description: "Build the Sentry OAuth PKCE authorize URL.",
+      riskLevel: "read",
+      fields: [
+        {
+          key: "clientId",
+          label: "Client ID",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "redirectUri",
+          label: "Redirect URI",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "scopes",
+          label: "Scopes",
+          type: "string_array",
+          required: false,
+          defaultValue: [],
+        },
+        {
+          key: "state",
+          label: "State",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "codeChallenge",
+          label: "Code challenge",
+          type: "string",
+          required: true,
+        },
+      ],
+      execute: buildAuthorizeUrl,
+    },
+    {
+      id: "exchange_code_for_token",
+      title: "Exchange Sentry OAuth code",
+      description: "Exchange a Sentry OAuth authorization code for tokens.",
+      riskLevel: "read",
+      fields: [
+        {
+          key: "clientId",
+          label: "Client ID",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "clientSecret",
+          label: "Client secret",
+          type: "string",
+          required: false,
+          defaultValue: "",
+          secret: true,
+        },
+        {
+          key: "code",
+          label: "Code",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "redirectUri",
+          label: "Redirect URI",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "codeVerifier",
+          label: "Code verifier",
+          type: "string",
+          required: true,
+          secret: true,
+        },
+      ],
+      execute: exchangeCodeForToken,
+    },
+    {
+      id: "refresh_token",
+      title: "Refresh Sentry OAuth token",
+      description: "Refresh a Sentry OAuth access token.",
+      riskLevel: "read",
+      fields: [
+        {
+          key: "clientId",
+          label: "Client ID",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "clientSecret",
+          label: "Client secret",
+          type: "string",
+          required: false,
+          defaultValue: "",
+          secret: true,
+        },
+        {
+          key: "refreshToken",
+          label: "Refresh token",
+          type: "string",
+          required: true,
+          secret: true,
+        },
+      ],
+      execute: refreshToken,
+    },
     {
       id: "list_organizations",
       title: "List Sentry organizations",

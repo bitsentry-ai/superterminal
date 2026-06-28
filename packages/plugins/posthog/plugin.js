@@ -89,6 +89,10 @@ function readApiBase(auth) {
   return assertAllowedPostHogBaseUrl(auth.baseUrl ?? auth.apiBase);
 }
 
+function oauthUrl(auth, pathname) {
+  return new URL(pathname, readApiBase(auth)).toString();
+}
+
 function authHeaders(accessToken) {
   return {
     Authorization: `Bearer ${accessToken}`,
@@ -180,6 +184,103 @@ async function requestPostHog(url, init, maxAttempts = 5) {
   }
 
   throw new Error("PostHog API request failed after retries");
+}
+
+function normalizeTokenResponse(payload) {
+  const accessToken = readString(payload?.access_token);
+  if (accessToken.length === 0) {
+    throw new Error("PostHog OAuth response did not include an access token");
+  }
+
+  const response = { accessToken };
+  const refreshToken = readString(payload?.refresh_token);
+  if (refreshToken.length > 0) {
+    response.refreshToken = refreshToken;
+  }
+
+  const expiresIn = Number(payload?.expires_in);
+  if (Number.isFinite(expiresIn)) {
+    response.expiresIn = expiresIn;
+  }
+
+  const scope = readString(payload?.scope);
+  if (scope.length > 0) {
+    response.scope = scope;
+  }
+
+  return response;
+}
+
+function buildAuthorizeUrl({ auth, input }) {
+  const url = new URL(oauthUrl(auth, "/oauth/authorize/"));
+  url.searchParams.set("client_id", requireString(input.clientId, "clientId"));
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("redirect_uri", requireString(input.redirectUri, "redirectUri"));
+  url.searchParams.set("scope", readStringArray(input.scopes).join(" "));
+  url.searchParams.set("state", requireString(input.state, "state"));
+  url.searchParams.set(
+    "code_challenge",
+    requireString(input.codeChallenge, "codeChallenge"),
+  );
+  url.searchParams.set("code_challenge_method", "S256");
+
+  return {
+    status: 200,
+    summary: "Built PostHog OAuth authorize URL.",
+    data: {
+      authUrl: url.toString(),
+    },
+  };
+}
+
+async function exchangeCodeForToken({ auth, input }) {
+  const payload = new URLSearchParams({
+    grant_type: "authorization_code",
+    code: requireString(input.code, "code"),
+    redirect_uri: requireString(input.redirectUri, "redirectUri"),
+    code_verifier: requireString(input.codeVerifier, "codeVerifier"),
+    client_id: requireString(input.clientId, "clientId"),
+  });
+  const clientSecret = readString(input.clientSecret);
+  if (clientSecret.length > 0) {
+    payload.set("client_secret", clientSecret);
+  }
+
+  const response = await requestPostHog(oauthUrl(auth, "/oauth/token/"), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: payload.toString(),
+  });
+
+  return {
+    status: 200,
+    summary: "Exchanged PostHog OAuth code.",
+    data: normalizeTokenResponse(await response.json()),
+  };
+}
+
+async function refreshToken({ auth, input }) {
+  const payload = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: requireString(input.refreshToken, "refreshToken"),
+    client_id: requireString(input.clientId, "clientId"),
+  });
+  const clientSecret = readString(input.clientSecret);
+  if (clientSecret.length > 0) {
+    payload.set("client_secret", clientSecret);
+  }
+
+  const response = await requestPostHog(oauthUrl(auth, "/oauth/token/"), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: payload.toString(),
+  });
+
+  return {
+    status: 200,
+    summary: "Refreshed PostHog OAuth token.",
+    data: normalizeTokenResponse(await response.json()),
+  };
 }
 
 function parsePaginatedResponse(payload) {
@@ -1063,6 +1164,9 @@ exports.plugin = {
         },
       ],
       providerActions: {
+        buildAuthorizeUrl: "build_authorize_url",
+        exchangeCodeForToken: "exchange_code_for_token",
+        refreshToken: "refresh_token",
         listOrganizations: "list_organizations",
         listProjects: "list_projects",
         getProject: "get_project",
@@ -1086,7 +1190,7 @@ exports.plugin = {
         key: "accessToken",
         label: "PostHog personal API key",
         type: "string",
-        required: true,
+        required: false,
         secret: true,
       },
       {
@@ -1099,6 +1203,118 @@ exports.plugin = {
     ],
   },
   actions: [
+    {
+      id: "build_authorize_url",
+      title: "Build PostHog OAuth authorize URL",
+      description: "Build the PostHog OAuth PKCE authorize URL.",
+      riskLevel: "read",
+      fields: [
+        {
+          key: "clientId",
+          label: "Client ID",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "redirectUri",
+          label: "Redirect URI",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "scopes",
+          label: "Scopes",
+          type: "string_array",
+          required: false,
+          defaultValue: [],
+        },
+        {
+          key: "state",
+          label: "State",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "codeChallenge",
+          label: "Code challenge",
+          type: "string",
+          required: true,
+        },
+      ],
+      execute: buildAuthorizeUrl,
+    },
+    {
+      id: "exchange_code_for_token",
+      title: "Exchange PostHog OAuth code",
+      description: "Exchange a PostHog OAuth authorization code for tokens.",
+      riskLevel: "read",
+      fields: [
+        {
+          key: "clientId",
+          label: "Client ID",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "clientSecret",
+          label: "Client secret",
+          type: "string",
+          required: false,
+          defaultValue: "",
+          secret: true,
+        },
+        {
+          key: "code",
+          label: "Code",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "redirectUri",
+          label: "Redirect URI",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "codeVerifier",
+          label: "Code verifier",
+          type: "string",
+          required: true,
+          secret: true,
+        },
+      ],
+      execute: exchangeCodeForToken,
+    },
+    {
+      id: "refresh_token",
+      title: "Refresh PostHog OAuth token",
+      description: "Refresh a PostHog OAuth access token.",
+      riskLevel: "read",
+      fields: [
+        {
+          key: "clientId",
+          label: "Client ID",
+          type: "string",
+          required: true,
+        },
+        {
+          key: "clientSecret",
+          label: "Client secret",
+          type: "string",
+          required: false,
+          defaultValue: "",
+          secret: true,
+        },
+        {
+          key: "refreshToken",
+          label: "Refresh token",
+          type: "string",
+          required: true,
+          secret: true,
+        },
+      ],
+      execute: refreshToken,
+    },
     {
       id: "list_organizations",
       title: "List PostHog organizations",

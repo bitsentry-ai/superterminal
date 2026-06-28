@@ -1,4 +1,8 @@
 import type { ErrorSourceType } from "./desktop-error-sources.types";
+import {
+  assertAllowedPostHogBaseUrl,
+  parsePostHogAllowedHostsEnv,
+} from "./posthog-base-url";
 
 type SourceWithPostHogConfig<TSourceType extends ErrorSourceType> = {
   sourceType: TSourceType;
@@ -59,6 +63,12 @@ export function getProviderForSource<
     throw new Error("PostHog provider does not support custom API bases");
   }
 
-  // Let allowlist errors propagate — fail closed.
-  return provider.withApiBase(posthogBaseUrl.trim());
+  // Let allowlist errors propagate before a plugin can receive a request URL.
+  return provider.withApiBase(
+    assertAllowedPostHogBaseUrl(posthogBaseUrl.trim(), {
+      extraAllowedHosts: parsePostHogAllowedHostsEnv(
+        process.env.POSTHOG_ALLOWED_BASE_URLS,
+      ),
+    }),
+  );
 }

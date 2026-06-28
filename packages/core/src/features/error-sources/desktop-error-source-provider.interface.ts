@@ -62,7 +62,7 @@ export interface EventBatchResponse {
 export interface ErrorSourceProvider {
   readonly sourceType: ErrorSourceType
 
-  buildAuthorizeUrl(input: OAuthAuthorizeInput): string
+  buildAuthorizeUrl(input: OAuthAuthorizeInput): string | Promise<string>
 
   exchangeCodeForToken(input: OAuthTokenExchangeInput): Promise<OAuthTokenResponse>
 

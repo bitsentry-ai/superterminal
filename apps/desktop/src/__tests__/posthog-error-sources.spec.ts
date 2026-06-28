@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events'
+import path from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const childProcessMocks = vi.hoisted(() => ({
@@ -24,7 +25,6 @@ import {
   parsePostHogAllowedHostsEnv,
   resolveSameOriginNextUrl,
 } from '@bitsentry-ce/core/features/error-sources'
-import { PostHogProviderAdapter } from '@bitsentry-ce/core/features/error-sources/desktop-posthog-provider.adapter'
 import {
   OauthManagerService,
   PROVIDER_CONFIGS,
@@ -36,6 +36,7 @@ import {
   type DesktopPluginExecutionResult,
   DesktopPluginDescriptor,
 } from '@bitsentry-ce/core/features/plugins'
+import { createDesktopNodePluginRuntimeService } from '@bitsentry-ce/core/features/plugins/node'
 
 function getOpenExternalInvocation(urlMatcher: unknown): { command: string; args: unknown[] } {
   if (process.platform === 'darwin') {
@@ -71,6 +72,9 @@ const posthogPluginDescriptor: DesktopPluginDescriptor = {
       sourceType: 'posthog',
       setupFields: [],
       providerActions: {
+        buildAuthorizeUrl: 'build_authorize_url',
+        exchangeCodeForToken: 'exchange_code_for_token',
+        refreshToken: 'refresh_token',
         listOrganizations: 'list_organizations',
         listProjects: 'list_projects',
         getProject: 'get_project',
@@ -107,6 +111,39 @@ function createPluginRuntime(
       )
     }
   })()
+}
+
+function createRepoPluginProviderFactory(): ErrorSourceProviderFactory {
+  return new ErrorSourceProviderFactory(
+    createDesktopNodePluginRuntimeService([
+      path.resolve(process.cwd(), '../../packages/plugins'),
+    ]),
+  )
+}
+
+function createRepoPostHogProvider(baseUrl = 'https://eu.posthog.com') {
+  return getProviderForSource(createRepoPluginProviderFactory(), {
+    sourceType: 'posthog',
+    configuration: { posthogBaseUrl: baseUrl },
+  })
+}
+
+function requireProjectProvider(provider: ReturnType<typeof createRepoPostHogProvider>) {
+  if (typeof (provider as { getProject?: unknown }).getProject !== 'function') {
+    throw new Error('Expected PostHog plugin provider to expose getProject')
+  }
+
+  return provider as typeof provider & {
+    getProject(input: {
+      accessToken: string
+      projectId: string
+    }): Promise<{
+      id: string
+      slug: string
+      name: string
+      organizationId?: string
+    }>
+  }
 }
 
 describe('posthog error source support', () => {
@@ -233,9 +270,7 @@ describe('posthog error source support', () => {
       ),
     )
 
-    const provider = new PostHogProviderAdapter({
-      apiBase: 'https://eu.posthog.com',
-    })
+    const provider = requireProjectProvider(createRepoPostHogProvider())
 
     await expect(
       provider.getProject({ accessToken: 'phx-token', projectId: '177710' }),
@@ -264,12 +299,10 @@ describe('posthog error source support', () => {
   })
 
   it('routes PostHog OAuth authorize and token requests through the selected base URL', async () => {
-    const provider = new PostHogProviderAdapter({
-      apiBase: 'https://eu.posthog.com',
-    })
+    const provider = createRepoPostHogProvider()
 
     const authorizeUrl = new URL(
-      provider.buildAuthorizeUrl({
+      await provider.buildAuthorizeUrl({
         clientId: 'client-id',
         redirectUri: 'bitsentry-desktop-ce://oauth/callback',
         scopes: ['project:read', 'query:read'],
@@ -349,7 +382,7 @@ describe('posthog error source support', () => {
     }
     const manager = new OauthManagerService(
       db,
-      new ErrorSourceProviderFactory(createPluginRuntime([posthogPluginDescriptor])),
+      createRepoPluginProviderFactory(),
     )
 
     const initiated = await manager.initiateOAuth('posthog', {

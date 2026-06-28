@@ -226,6 +226,9 @@ export type DesktopPluginErrorSourceSetupField = z.infer<
 >;
 
 export const desktopPluginErrorSourceProviderActionsSchema = z.object({
+  buildAuthorizeUrl: z.string().min(1).optional(),
+  exchangeCodeForToken: z.string().min(1).optional(),
+  refreshToken: z.string().min(1).optional(),
   listOrganizations: z.string().min(1).optional(),
   listProjects: z.string().min(1).optional(),
   getProject: z.string().min(1).optional(),
