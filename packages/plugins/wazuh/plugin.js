@@ -9,6 +9,39 @@ function readString(value, fallback = "") {
   return fallback;
 }
 
+function readRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function readIsoTimestamp(value) {
+  const raw = readString(value);
+  const parsed = new Date(raw);
+  if (Number.isFinite(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+
+  return new Date().toISOString();
+}
+
+function readCursorOffset(value) {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+
+  return 0;
+}
+
 function readPositiveInteger(value, fallback) {
   if (typeof value === "number" && Number.isInteger(value) && value > 0) {
     return value;
@@ -23,6 +56,120 @@ function readNonNegativeInteger(value, fallback) {
   }
 
   return fallback;
+}
+
+function readWazuhSourceRecord(hit) {
+  return readRecord(hit?._source);
+}
+
+function readWazuhRuleRecord(hit) {
+  return readRecord(readWazuhSourceRecord(hit)?.rule);
+}
+
+function readWazuhAgentRecord(hit) {
+  return readRecord(readWazuhSourceRecord(hit)?.agent);
+}
+
+function readWazuhManagerRecord(hit) {
+  return readRecord(readWazuhSourceRecord(hit)?.manager);
+}
+
+function readWazuhDescription(hit) {
+  const ruleDescription = readString(readWazuhRuleRecord(hit)?.description);
+  if (ruleDescription.length > 0) {
+    return ruleDescription;
+  }
+
+  const fullLog = readString(readWazuhSourceRecord(hit)?.full_log);
+  if (fullLog.length > 0) {
+    return fullLog;
+  }
+
+  return "Wazuh alert";
+}
+
+function readWazuhLevelText(hit) {
+  const rawLevel = Number(readWazuhRuleRecord(hit)?.level);
+  if (!Number.isFinite(rawLevel)) {
+    return "warning";
+  }
+
+  if (rawLevel >= 12) return "fatal";
+  if (rawLevel >= 8) return "error";
+  if (rawLevel >= 4) return "warning";
+  return "info";
+}
+
+function buildWazuhTags(hit) {
+  const source = readWazuhSourceRecord(hit);
+  const rule = readWazuhRuleRecord(hit);
+  const agent = readWazuhAgentRecord(hit);
+  const manager = readWazuhManagerRecord(hit);
+  const decoder = readRecord(source?.decoder);
+  const tags = {};
+
+  const ruleId = readString(rule?.id);
+  if (ruleId.length > 0) tags.ruleId = ruleId;
+  if (rule?.level !== undefined) tags.ruleLevel = rule.level;
+  const ruleDescription = readString(rule?.description);
+  if (ruleDescription.length > 0) tags.ruleDescription = ruleDescription;
+  const agentId = readString(agent?.id);
+  if (agentId.length > 0) tags.agentId = agentId;
+  const agentName = readString(agent?.name);
+  if (agentName.length > 0) tags.agentName = agentName;
+  const managerName = readString(manager?.name);
+  if (managerName.length > 0) tags.managerName = managerName;
+  const location = readString(source?.location);
+  if (location.length > 0) tags.location = location;
+  const decoderName = readString(decoder?.name);
+  if (decoderName.length > 0) tags.decoderName = decoderName;
+
+  return tags;
+}
+
+function mapAlertToIssue(hit) {
+  const externalId = readString(hit?._id);
+  if (externalId.length === 0) {
+    return undefined;
+  }
+
+  const source = readWazuhSourceRecord(hit);
+  const rule = readWazuhRuleRecord(hit);
+  const agent = readWazuhAgentRecord(hit);
+  const manager = readWazuhManagerRecord(hit);
+  const timestamp = readIsoTimestamp(source?.["@timestamp"]);
+  const title = readWazuhDescription(hit);
+  const fullLog = readString(source?.full_log, title);
+  const agentName = readString(agent?.name);
+  const managerName = readString(manager?.name);
+
+  return {
+    id: externalId,
+    externalIssueId: externalId,
+    latestEventId: externalId,
+    title,
+    message: fullLog,
+    culprit: agentName || readString(source?.location),
+    type: readString(rule?.id),
+    metadata: rule,
+    projectIdentifier: readString(hit?._index),
+    level: readWazuhLevelText(hit),
+    status: "unresolved",
+    isUnhandled: true,
+    firstSeen: timestamp,
+    lastSeen: timestamp,
+    timestamp,
+    eventCount: 1,
+    userCount: null,
+    tags: buildWazuhTags(hit),
+    environment: managerName,
+    platform: "wazuh",
+    contexts: source,
+    user: agent,
+    serverName: agentName || managerName,
+    transactionName: readString(source?.location),
+    rawAlert: hit,
+  };
 }
 
 function requireString(value, fieldName) {
@@ -186,6 +333,35 @@ async function searchAlerts({ auth, input }) {
   };
 }
 
+async function queryIssues(context) {
+  const offset = readCursorOffset(context.input.cursor);
+  const result = await searchAlerts({
+    auth: context.auth,
+    input: {
+      ...context.input,
+      offset,
+    },
+  });
+  const data = readRecord(result.data) ?? {};
+  const items = Array.isArray(data.items) ? data.items : [];
+  const issues = items
+    .map((item) => mapAlertToIssue(item))
+    .filter((item) => item !== undefined);
+  const hasMore = data.hasMore === true && items.length > 0;
+
+  return {
+    ...result,
+    summary: `Fetched ${String(issues.length)} Wazuh issues.`,
+    data: {
+      issues,
+      hasMore,
+      nextCursor: hasMore ? String(offset + items.length) : undefined,
+      total: data.total,
+      output: data.output,
+    },
+  };
+}
+
 exports.plugin = {
   id: "wazuh",
   name: "Wazuh",
@@ -196,7 +372,7 @@ exports.plugin = {
       sourceType: "wazuh",
       setupFields: [
         {
-          key: "baseUrl",
+          key: "indexUrl",
           target: "baseUrl",
           storage: "configuration",
           configurationKey: "baseUrl",
@@ -229,6 +405,7 @@ exports.plugin = {
         },
       ],
       providerActions: {
+        queryIssues: "query_issues",
         searchAlerts: "search_alerts",
       },
     },
@@ -258,6 +435,55 @@ exports.plugin = {
     ],
   },
   actions: [
+    {
+      id: "query_issues",
+      title: "Query Wazuh issues",
+      description:
+        "Search Wazuh/OpenSearch alerts and return normalized issue records for sync.",
+      riskLevel: "read",
+      fields: [
+        {
+          key: "query",
+          label: "Query",
+          type: "string",
+          required: false,
+          defaultValue: "*",
+        },
+        {
+          key: "indexPattern",
+          label: "Index pattern",
+          type: "string",
+          required: false,
+          defaultValue: "wazuh-alerts-*",
+        },
+        {
+          key: "limit",
+          label: "Limit",
+          type: "number",
+          required: false,
+          defaultValue: 20,
+        },
+        {
+          key: "cursor",
+          label: "Cursor",
+          type: "string",
+          required: false,
+        },
+        {
+          key: "since",
+          label: "Since",
+          type: "string",
+          required: false,
+        },
+        {
+          key: "until",
+          label: "Until",
+          type: "string",
+          required: false,
+        },
+      ],
+      execute: queryIssues,
+    },
     {
       id: "search_alerts",
       title: "Search Wazuh alerts",

@@ -5,6 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 type WazuhPluginData = {
   items?: Array<{ _id?: string }>
+  issues?: Array<{
+    externalIssueId?: string
+    level?: string
+    platform?: string
+    serverName?: string
+    title?: string
+  }>
   output?: string
   total?: number
   hasMore?: boolean
@@ -26,14 +33,15 @@ describe('Wazuh code plugin', () => {
         errorSource: {
           sourceType: 'wazuh',
           providerActions: {
+            queryIssues: 'query_issues',
             searchAlerts: 'search_alerts',
           },
         },
       },
     })
 
-    const fetchMock = vi.fn<(url: string, request?: RequestInit) => Promise<Response>>().mockResolvedValue(
-      new Response(
+    const fetchMock = vi.fn<(url: string, request?: RequestInit) => Promise<Response>>().mockImplementation(
+      () => Promise.resolve(new Response(
         JSON.stringify({
           hits: {
             total: { value: 1, relation: 'eq' },
@@ -61,7 +69,7 @@ describe('Wazuh code plugin', () => {
           status: 200,
           headers: { 'content-type': 'application/json' },
         },
-      ),
+      )),
     )
     vi.stubGlobal('fetch', fetchMock)
 
@@ -97,7 +105,45 @@ describe('Wazuh code plugin', () => {
     expect(data.items?.[0]?._id).toBe('alert-1')
     expect(data.output).toContain('sshd brute force attempt')
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const queryResult = await runtime.executeAction({
+      pluginId: 'wazuh',
+      actionId: 'query_issues',
+      auth: {
+        indexUrl: 'https://wazuh.example.com:9200',
+        indexPassword: 'wazuh-secret',
+      },
+      input: {
+        query: 'rule.level:>=10',
+        indexPattern: 'wazuh-alerts-*',
+        limit: 2,
+        cursor: '4',
+        since: '2026-06-01T00:00:00.000Z',
+        until: '2026-06-01T01:00:00.000Z',
+      },
+    })
+
+    expect(queryResult).toMatchObject({
+      pluginId: 'wazuh',
+      actionId: 'query_issues',
+      ok: true,
+      status: 200,
+      summary: 'Fetched 1 Wazuh issues.',
+      data: {
+        issues: [
+          {
+            externalIssueId: 'alert-1',
+            level: 'error',
+            platform: 'wazuh',
+            serverName: 'prod-api-1',
+            title: 'sshd brute force attempt',
+          },
+        ],
+        hasMore: false,
+        total: 1,
+      },
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
     const firstCall = fetchMock.mock.calls[0]
     if (firstCall === undefined) {
       throw new Error('Expected Wazuh plugin to call fetch')
@@ -144,6 +190,22 @@ describe('Wazuh code plugin', () => {
           ],
         },
       },
+    })
+
+    const secondCall = fetchMock.mock.calls[1]
+    if (secondCall === undefined) {
+      throw new Error('Expected Wazuh plugin to call fetch for query_issues')
+    }
+
+    const [, queryRequest] = secondCall
+    if (queryRequest === undefined || typeof queryRequest.body !== 'string') {
+      throw new Error('Expected Wazuh query_issues to send a JSON request body')
+    }
+
+    const queryBody = JSON.parse(queryRequest.body) as unknown
+    expect(queryBody).toMatchObject({
+      size: 2,
+      from: 4,
     })
   })
 })

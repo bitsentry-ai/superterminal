@@ -302,7 +302,7 @@ function readStringArray(value: unknown): string[] {
     .filter((item) => item.length > 0)
 }
 
-function readWazuhIndexPattern(source: ErrorSource): string | undefined {
+function readPluginIndexPattern(source: ErrorSource): string | undefined {
   const indexPatterns = readStringArray(source.configuration.indexPatterns)
   if (indexPatterns.length > 0) {
     return indexPatterns.join(',')
@@ -314,21 +314,6 @@ function readWazuhIndexPattern(source: ErrorSource): string | undefined {
   }
 
   return undefined
-}
-
-function buildWazuhPluginAuth(source: ErrorSource): Record<string, unknown> {
-  const auth: Record<string, unknown> = {}
-  const indexUrl = readOptionalString(source.configuration.baseUrl)
-  if (indexUrl !== null) {
-    auth.indexUrl = indexUrl.replace(/\/+$/, '')
-  }
-
-  const indexPassword = readOptionalString(source.accessTokenRef)
-  if (indexPassword !== null) {
-    auth.indexPassword = indexPassword
-  }
-
-  return auth
 }
 
 function readSourcePluginId(source: ErrorSource): string {
@@ -410,7 +395,7 @@ function buildGenericPluginSyncInput(args: {
     input.projectSlugs = projectSlugs
   }
 
-  const indexPattern = readWazuhIndexPattern(source)
+  const indexPattern = readPluginIndexPattern(source)
   if (indexPattern !== undefined) {
     input.indexPattern = indexPattern
   }
@@ -574,116 +559,6 @@ function readPluginEventTimestamp(record: ExternalPayloadRecord, fallback: strin
   )
 }
 
-function readWazuhItems(data: unknown): ExternalPayloadRecord[] {
-  if (
-    data === null ||
-    typeof data !== 'object' ||
-    Array.isArray(data) ||
-    !('items' in data)
-  ) {
-    return []
-  }
-
-  return readRecordArray((data as { items?: unknown }).items)
-}
-
-function readWazuhHasMore(data: unknown): boolean {
-  if (
-    data !== null &&
-    typeof data === 'object' &&
-    !Array.isArray(data) &&
-    typeof (data as { hasMore?: unknown }).hasMore === 'boolean'
-  ) {
-    return (data as { hasMore: boolean }).hasMore
-  }
-
-  return false
-}
-
-function readWazuhExternalId(hit: ExternalPayloadRecord): string | null {
-  return readOptionalString(hit._id)
-}
-
-function readWazuhSourceRecord(hit: ExternalPayloadRecord): ExternalPayloadRecord | null {
-  return readRecord(hit._source)
-}
-
-function readWazuhRuleRecord(hit: ExternalPayloadRecord): ExternalPayloadRecord | null {
-  return readRecord(readWazuhSourceRecord(hit)?.rule)
-}
-
-function readWazuhAgentRecord(hit: ExternalPayloadRecord): ExternalPayloadRecord | null {
-  return readRecord(readWazuhSourceRecord(hit)?.agent)
-}
-
-function readWazuhManagerRecord(hit: ExternalPayloadRecord): ExternalPayloadRecord | null {
-  return readRecord(readWazuhSourceRecord(hit)?.manager)
-}
-
-function readWazuhDescription(hit: ExternalPayloadRecord): string {
-  const rule = readWazuhRuleRecord(hit)
-  const description = readOptionalString(rule?.description)
-  if (description !== null) {
-    return description
-  }
-
-  const source = readWazuhSourceRecord(hit)
-  const fullLog = readOptionalString(source?.full_log)
-  if (fullLog !== null) {
-    return fullLog
-  }
-
-  return 'Wazuh alert'
-}
-
-function readWazuhTimestamp(hit: ExternalPayloadRecord): string {
-  const source = readWazuhSourceRecord(hit)
-  return toIsoOrNow(source?.['@timestamp'])
-}
-
-function readWazuhLevelText(hit: ExternalPayloadRecord): string {
-  const rule = readWazuhRuleRecord(hit)
-  const rawLevel = Number(rule?.level)
-  if (!Number.isFinite(rawLevel)) {
-    return 'warning'
-  }
-
-  if (rawLevel >= 12) return 'fatal'
-  if (rawLevel >= 8) return 'error'
-  if (rawLevel >= 4) return 'warning'
-  return 'info'
-}
-
-function buildWazuhTags(hit: ExternalPayloadRecord): Record<string, unknown> | null {
-  const source = readWazuhSourceRecord(hit)
-  const rule = readWazuhRuleRecord(hit)
-  const agent = readWazuhAgentRecord(hit)
-  const manager = readWazuhManagerRecord(hit)
-  const tags: Record<string, unknown> = {}
-
-  const ruleId = readOptionalString(rule?.id)
-  if (ruleId !== null) tags.ruleId = ruleId
-  if (rule?.level !== undefined) tags.ruleLevel = rule.level
-  const ruleDescription = readOptionalString(rule?.description)
-  if (ruleDescription !== null) tags.ruleDescription = ruleDescription
-  const agentId = readOptionalString(agent?.id)
-  if (agentId !== null) tags.agentId = agentId
-  const agentName = readOptionalString(agent?.name)
-  if (agentName !== null) tags.agentName = agentName
-  const managerName = readOptionalString(manager?.name)
-  if (managerName !== null) tags.managerName = managerName
-  const location = readOptionalString(source?.location)
-  if (location !== null) tags.location = location
-  const decoderName = readOptionalString(readRecord(source?.decoder)?.name)
-  if (decoderName !== null) tags.decoderName = decoderName
-
-  if (Object.keys(tags).length === 0) {
-    return null
-  }
-
-  return tags
-}
-
 function parseLevelToRuleLevel(level: string | null): number {
   const normalized = (level ?? '').toLowerCase()
   if (normalized === 'fatal') return 10
@@ -811,10 +686,6 @@ export class ErrorSourceSyncService {
     )
 
     try {
-      if (source.sourceType === 'wazuh') {
-        return await this.syncWazuhSource(source)
-      }
-
       const pluginId = readSourcePluginId(source)
       const plugin = this.pluginRuntime.getPlugin(pluginId)
       if (
@@ -1429,166 +1300,6 @@ export class ErrorSourceSyncService {
       const issue = toDiagnosisIssueContext(readRecord(payload.issue))
       const event = toDiagnosisEventContext(readRecord(payload.event))
       await this.ensureDefaultDiagnosisEntry(row.id, { source, issue, event })
-    }
-  }
-
-  private async syncWazuhSource(
-    source: ErrorSource,
-  ): Promise<{ sourceId: string; syncedIssues: number; syncedEvents: number }> {
-    const syncStartedAt = new Date().toISOString()
-    const since = source.lastSyncAt ?? undefined
-    const until = syncStartedAt
-    const limit = 100
-    const maxPages = 10
-    const indexPattern = readWazuhIndexPattern(source)
-    const auth = buildWazuhPluginAuth(source)
-
-    let offset = 0
-    let pageCount = 0
-    let hasMore = true
-    let syncedIssues = 0
-    let syncedEvents = 0
-
-    while (hasMore && pageCount < maxPages) {
-      pageCount += 1
-      const pageStartMs = Date.now()
-      const pluginId = readSourcePluginId(source)
-      const pluginInput: Record<string, unknown> = {
-        query: '*',
-        limit,
-        offset,
-      }
-      if (indexPattern !== undefined) {
-        pluginInput.indexPattern = indexPattern
-      }
-      if (since !== undefined) {
-        pluginInput.since = since
-      }
-      if (until !== undefined) {
-        pluginInput.until = until
-      }
-
-      const result = await this.pluginRuntime.executeAction({
-        pluginId,
-        actionId: resolveErrorSourceProviderActionId({
-          runtime: this.pluginRuntime,
-          pluginId,
-          sourceType: source.sourceType,
-          action: 'searchAlerts',
-        }),
-        auth,
-        input: pluginInput,
-      })
-      const items = readWazuhItems(result.data)
-      hasMore = readWazuhHasMore(result.data) && items.length > 0
-      log.info(
-        `[sync] id=${source.id} wazuhSearch page=${String(pageCount)} returned=${String(items.length)} hasMore=${String(hasMore)} elapsedMs=${formatElapsedMs(pageStartMs)}`,
-      )
-
-      for (const hit of items) {
-        const externalId = readWazuhExternalId(hit)
-        if (externalId === null) {
-          continue
-        }
-
-        const timestamp = readWazuhTimestamp(hit)
-        const description = readWazuhDescription(hit)
-        const level = readWazuhLevelText(hit)
-        if (!shouldIngestByThreshold(level, source.logLevelThreshold)) {
-          continue
-        }
-
-        const sourceRecord = readWazuhSourceRecord(hit)
-        const ruleRecord = readWazuhRuleRecord(hit)
-        const agentRecord = readWazuhAgentRecord(hit)
-        const managerRecord = readWazuhManagerRecord(hit)
-        const tags = buildWazuhTags(hit)
-        const issue = await this.issuesRepository.upsert({
-          sourceId: source.id,
-          externalIssueId: externalId,
-          externalShortId: null,
-          title: description,
-          culprit:
-            readOptionalString(agentRecord?.name) ??
-            readOptionalString(sourceRecord?.location),
-          type: readOptionalString(ruleRecord?.id),
-          metadata: ruleRecord,
-          projectIdentifier: readOptionalString(hit._index),
-          level,
-          status: 'unresolved',
-          isUnhandled: true,
-          firstSeen: timestamp,
-          lastSeen: timestamp,
-          eventCount: 1,
-          userCount: null,
-          tags,
-          environment: readOptionalString(managerRecord?.name),
-          release: null,
-          platform: 'wazuh',
-          additionalMetadata: hit,
-        })
-        syncedIssues += 1
-
-        await this.eventsRepository.upsert({
-          sourceId: source.id,
-          issueId: issue.id,
-          externalEventId: externalId,
-          timestamp,
-          message: readOptionalString(sourceRecord?.full_log) ?? description,
-          exceptionType: null,
-          exceptionValue: null,
-          exceptionMechanism: null,
-          stacktrace: null,
-          inAppFrames: null,
-          tags,
-          contexts: sourceRecord,
-          userContext: agentRecord,
-          requestContext: null,
-          environment: readOptionalString(managerRecord?.name),
-          release: null,
-          serverName:
-            readOptionalString(agentRecord?.name) ??
-            readOptionalString(managerRecord?.name),
-          traceId: null,
-          requestId: null,
-          transactionName: readOptionalString(sourceRecord?.location),
-          additionalMetadata: hit,
-        })
-        syncedEvents += 1
-        await this.projectEventToDiagnosis(source, issue, {
-          id: externalId,
-          externalEventId: externalId,
-          timestamp,
-          message: readOptionalString(sourceRecord?.full_log) ?? description,
-          exceptionType: null,
-          exceptionValue: null,
-          environment: readOptionalString(managerRecord?.name),
-          serverName:
-            readOptionalString(agentRecord?.name) ??
-            readOptionalString(managerRecord?.name),
-        })
-      }
-
-      if (items.length < limit) {
-        hasMore = false
-      }
-      offset += items.length
-    }
-
-    await this.backfillMissingDiagnosisEntriesForSource(source.id)
-    await this.sourcesRepository.update({
-      id: source.id,
-      lastSyncAt: syncStartedAt,
-      lastSyncStatus: 'success',
-      lastSyncError: null,
-    })
-    log.info(
-      `[sync] success id=${source.id} type=${source.sourceType} issues=${String(syncedIssues)} events=${String(syncedEvents)}`,
-    )
-    return {
-      sourceId: source.id,
-      syncedIssues,
-      syncedEvents,
     }
   }
 
