@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { cp, mkdtemp, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readdir, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
