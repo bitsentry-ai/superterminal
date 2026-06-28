@@ -423,9 +423,11 @@ function summarizePluginAction(
     const selectedAction = selectedPlugin.actions.find(
       (pluginAction) => pluginAction.id === action.pluginActionId,
     );
-    actionLabel =
-      selectedAction?.title ??
-      (action.pluginActionId?.trim().length ? action.pluginActionId : actionLabel);
+    if (selectedAction !== undefined) {
+      actionLabel = selectedAction.title;
+    } else if (action.pluginActionId?.trim().length) {
+      actionLabel = action.pluginActionId;
+    }
   } else if (action.pluginActionId?.trim().length) {
     actionLabel = action.pluginActionId;
   }

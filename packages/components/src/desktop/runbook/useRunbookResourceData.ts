@@ -171,7 +171,11 @@ export function useRunbookResourceData({
           {},
         );
         if (!cancelled) {
-          setPluginDescriptors(Array.isArray(response.data) ? response.data : []);
+          let plugins: PluginDescriptor[] = [];
+          if (Array.isArray(response.data)) {
+            plugins = response.data;
+          }
+          setPluginDescriptors(plugins);
         }
       } catch (error) {
         console.error("Failed to load plugins:", error);
