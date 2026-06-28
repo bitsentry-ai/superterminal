@@ -28,7 +28,10 @@ import type {
 import {
   createDesktopNodePluginRuntimeService,
 } from '../plugins/node'
-import { resolveErrorSourceProviderActionId } from './desktop-plugin-error-source-actions'
+import {
+  hasErrorSourceProviderAction,
+  resolveErrorSourceProviderActionId,
+} from './desktop-plugin-error-source-actions'
 
 const POSTHOG_PROJECT_SCOPED_API_KEY_MESSAGE =
   'This PostHog API key is scoped to specific projects. Add at least one numeric Project ID so BitSentry can use PostHog project-based endpoints.'
@@ -1915,12 +1918,11 @@ export function createDesktopErrorSourcesHandlers(
       const plugin = pluginRuntime.getPlugin(pluginId)
 
       if (plugin?.metadata?.errorSource?.sourceType === source.sourceType) {
-        const providerActions = plugin.metadata.errorSource.providerActions
         const auth = buildPluginAuthFromSource(source, pluginRuntime)
         const input = buildGenericPluginConnectionInput(source)
 
         try {
-          if (providerActions?.queryIssues !== undefined) {
+          if (hasErrorSourceProviderAction(plugin, 'queryIssues')) {
             const result = await pluginRuntime.executeAction({
               pluginId,
               actionId: resolveErrorSourceProviderActionId({
@@ -1942,7 +1944,7 @@ export function createDesktopErrorSourcesHandlers(
             }
           }
 
-          if (providerActions?.searchAlerts !== undefined) {
+          if (hasErrorSourceProviderAction(plugin, 'searchAlerts')) {
             const result = await pluginRuntime.executeAction({
               pluginId,
               actionId: resolveErrorSourceProviderActionId({
@@ -1963,7 +1965,7 @@ export function createDesktopErrorSourcesHandlers(
             }
           }
 
-          if (providerActions?.listOrganizations !== undefined) {
+          if (hasErrorSourceProviderAction(plugin, 'listOrganizations')) {
             const result = await pluginRuntime.executeAction({
               pluginId,
               actionId: resolveErrorSourceProviderActionId({

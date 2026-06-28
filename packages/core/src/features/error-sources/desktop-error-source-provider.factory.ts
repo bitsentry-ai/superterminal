@@ -4,15 +4,19 @@ import { PluginBackedErrorSourceProviderAdapter } from './desktop-plugin-backed-
 import type { DesktopPluginDescriptor } from '../plugins/plugins.types'
 import type { DesktopPluginRuntimeService } from '../plugins/desktop-plugin-registry'
 import { createDesktopNodePluginRuntimeService } from '../plugins/desktop-plugin-runtime.node'
+import {
+  hasErrorSourceProviderAction,
+  type ErrorSourceProviderActionKey,
+} from './desktop-plugin-error-source-actions'
 
-const ISSUE_PROVIDER_ACTIONS = [
+const ISSUE_PROVIDER_ACTIONS: ErrorSourceProviderActionKey[] = [
   'listOrganizations',
   'listProjects',
   'getProject',
   'queryIssues',
   'listIssues',
   'listIssueEvents',
-] as const
+]
 
 export class ErrorSourceProviderFactory {
   private readonly providers = new Map<ErrorSourceType, ErrorSourceProvider>()
@@ -78,13 +82,8 @@ export class ErrorSourceProviderFactory {
   }
 
   private hasIssueProviderActions(plugin: DesktopPluginDescriptor): boolean {
-    const providerActions = plugin.metadata?.errorSource?.providerActions
-    if (providerActions === undefined) {
-      return false
-    }
-
     for (const action of ISSUE_PROVIDER_ACTIONS) {
-      if (providerActions[action] !== undefined) {
+      if (hasErrorSourceProviderAction(plugin, action)) {
         return true
       }
     }

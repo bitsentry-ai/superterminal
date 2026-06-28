@@ -12,7 +12,10 @@ import type {
   DesktopPluginRuntimeService,
 } from "../plugins/desktop-plugin-registry";
 import type { DesktopPluginErrorSourceSetupField } from "../plugins/plugins.types";
-import { resolveErrorSourceProviderActionId } from "./desktop-plugin-error-source-actions";
+import {
+  hasErrorSourceProviderAction,
+  resolveErrorSourceProviderActionId,
+} from "./desktop-plugin-error-source-actions";
 
 export interface ExternalSourceRunbookQueryInput {
   sourceId: string;
@@ -333,7 +336,7 @@ function executeCustomPluginQuery(args: {
   const pluginId = readSourcePluginId(source);
   const plugin = pluginRuntime.getPlugin(pluginId);
   const metadata = plugin?.metadata?.errorSource;
-  if (metadata?.sourceType !== source.sourceType) {
+  if (plugin === null || metadata?.sourceType !== source.sourceType) {
     throw new Error(
       `External Source plugin "${pluginId}" does not match source type ${source.sourceType}`,
     );
@@ -341,9 +344,8 @@ function executeCustomPluginQuery(args: {
 
   const auth = buildPluginAuthFromSource(source, pluginRuntime);
   const input = buildGenericPluginQueryInput(source, query, limit);
-  const providerActions = metadata.providerActions;
 
-  if (providerActions?.queryIssues !== undefined) {
+  if (hasErrorSourceProviderAction(plugin, "queryIssues")) {
     return pluginRuntime.executeAction({
       pluginId,
       actionId: resolveErrorSourceProviderActionId({
@@ -364,7 +366,7 @@ function executeCustomPluginQuery(args: {
     });
   }
 
-  if (providerActions?.searchAlerts !== undefined) {
+  if (hasErrorSourceProviderAction(plugin, "searchAlerts")) {
     return pluginRuntime.executeAction({
       pluginId,
       actionId: resolveErrorSourceProviderActionId({

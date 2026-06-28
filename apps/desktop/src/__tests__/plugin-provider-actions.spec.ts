@@ -58,20 +58,34 @@ function createPluginDescriptor(
   }
 }
 
-describe('plugin-backed error source provider actions', () => {
-  it('requires provider action IDs to come from plugin metadata', () => {
-    const runtime = new TestPluginRuntimeService([createPluginDescriptor()])
+function createProviderAction(
+  id: string,
+): DesktopPluginDescriptor['actions'][number] {
+  return {
+    id,
+    title: id,
+    description: `${id} action.`,
+    riskLevel: 'read',
+    fields: [],
+  }
+}
 
-    expect(() =>
+describe('plugin-backed error source provider actions', () => {
+  it('resolves conventional code action IDs without provider metadata', () => {
+    const runtime = new TestPluginRuntimeService([
+      createPluginDescriptor({
+        actions: [createProviderAction('queryIssues')],
+      }),
+    ])
+
+    expect(
       resolveErrorSourceProviderActionId({
         runtime,
         pluginId: 'posthog',
         sourceType: 'posthog',
         action: 'queryIssues',
       }),
-    ).toThrow(
-      'Plugin "posthog" does not declare a provider action for "queryIssues".',
-    )
+    ).toBe('queryIssues')
   })
 
   it('resolves explicit provider action IDs from code plugin metadata', () => {
@@ -109,19 +123,11 @@ describe('plugin-backed error source provider actions', () => {
     )
   })
 
-  it('registers named providers when their code plugin declares provider actions', () => {
+  it('registers named providers from conventional code action IDs', () => {
     const factory = new ErrorSourceProviderFactory(
       new TestPluginRuntimeService([
         createPluginDescriptor({
-          metadata: {
-            errorSource: {
-              sourceType: 'posthog',
-              setupFields: [],
-              providerActions: {
-                listOrganizations: 'list_organizations',
-              },
-            },
-          },
+          actions: [createProviderAction('listOrganizations')],
         }),
       ]),
     )
@@ -138,16 +144,16 @@ describe('plugin-backed error source provider actions', () => {
           errorSource: {
             sourceType: 'github',
             setupFields: [],
-            providerActions: {
-              listOrganizations: 'list_orgs',
-              listProjects: 'list_projects',
-            },
           },
         },
+        actions: [
+          createProviderAction('listOrganizations'),
+          createProviderAction('listProjects'),
+        ],
       }),
     ])
     runtime.executeActionMock.mockImplementation((input) => {
-      if (input.actionId === 'list_orgs') {
+      if (input.actionId === 'listOrganizations') {
         return Promise.resolve({
           pluginId: input.pluginId,
           actionId: input.actionId,
@@ -186,7 +192,7 @@ describe('plugin-backed error source provider actions', () => {
       1,
       expect.objectContaining({
         pluginId: 'github',
-        actionId: 'list_orgs',
+        actionId: 'listOrganizations',
         auth: { accessToken: 'gh-token' },
       }),
     )
@@ -194,7 +200,7 @@ describe('plugin-backed error source provider actions', () => {
       2,
       expect.objectContaining({
         pluginId: 'github',
-        actionId: 'list_projects',
+        actionId: 'listProjects',
         auth: { accessToken: 'gh-token' },
         input: { orgSlug: 'bitsentry-ai' },
       }),

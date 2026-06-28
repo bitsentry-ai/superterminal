@@ -33,7 +33,10 @@ import type {
   DesktopPluginRuntimeService,
 } from '../plugins'
 import type { DesktopPluginErrorSourceSetupField } from '../plugins/plugins.types'
-import { resolveErrorSourceProviderActionId } from './desktop-plugin-error-source-actions'
+import {
+  hasErrorSourceProviderAction,
+  resolveErrorSourceProviderActionId,
+} from './desktop-plugin-error-source-actions'
 
 type ExternalPayloadRecord = Record<string, unknown>
 
@@ -1310,15 +1313,17 @@ export class ErrorSourceSyncService {
       )
     }
 
-    const providerActions = plugin.metadata.errorSource.providerActions
-    if (
-      providerActions?.listIssues === undefined &&
-      providerActions?.queryIssues === undefined
-    ) {
+    const hasListIssues = hasErrorSourceProviderAction(plugin, 'listIssues')
+    const hasQueryIssues = hasErrorSourceProviderAction(plugin, 'queryIssues')
+    if (!hasListIssues && !hasQueryIssues) {
       throw new Error(
         `Error source plugin "${pluginId}" does not declare listIssues or queryIssues`,
       )
     }
+    const hasListIssueEvents = hasErrorSourceProviderAction(
+      plugin,
+      'listIssueEvents',
+    )
 
     const auth = buildPluginAuthFromSource(source, this.pluginRuntime)
     const syncStartedAt = new Date().toISOString()
@@ -1334,7 +1339,7 @@ export class ErrorSourceSyncService {
       pageCount += 1
       const pageStartMs = Date.now()
       let action: 'listIssues' | 'queryIssues' = 'queryIssues'
-      if (providerActions.listIssues !== undefined) {
+      if (hasListIssues) {
         action = 'listIssues'
       }
       const result = await this.pluginRuntime.executeAction({
@@ -1427,7 +1432,7 @@ export class ErrorSourceSyncService {
         })
         syncedIssues += 1
 
-        if (providerActions.listIssueEvents !== undefined) {
+        if (hasListIssueEvents) {
           let eventCursor: string | undefined
           let eventPageCount = 0
           let eventsHasMore = true
