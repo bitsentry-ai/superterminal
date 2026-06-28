@@ -9,6 +9,18 @@ import {
   desktopPluginTriggerDefinitionSchema,
 } from "./plugins.types";
 
+type DesktopLocalPluginTemplateValue =
+  | string
+  | {
+      kind: "join";
+      values: DesktopLocalPluginTemplateValue[];
+      separator?: string;
+    }
+  | {
+      kind: "first";
+      values: DesktopLocalPluginTemplateValue[];
+    };
+
 const desktopLocalHttpPluginPaginationSchema = z.object({
   kind: z.literal("next_url"),
   itemsPath: z.string().min(1),
@@ -18,14 +30,23 @@ const desktopLocalHttpPluginPaginationSchema = z.object({
 
 const desktopLocalHttpPluginJoinTemplateSchema = z.object({
   kind: z.literal("join"),
-  values: z.array(z.string().min(1)).min(1),
+  values: z.array(z.lazy(() => desktopLocalHttpPluginTemplateValueSchema)).min(1),
   separator: z.string().default(" "),
 });
 
-const desktopLocalHttpPluginTemplateValueSchema = z.union([
-  z.string().min(1),
-  desktopLocalHttpPluginJoinTemplateSchema,
-]);
+const desktopLocalHttpPluginFirstTemplateSchema = z.object({
+  kind: z.literal("first"),
+  values: z.array(z.lazy(() => desktopLocalHttpPluginTemplateValueSchema)).min(1),
+});
+
+const desktopLocalHttpPluginTemplateValueSchema: z.ZodType<DesktopLocalPluginTemplateValue> =
+  z.lazy(() =>
+    z.union([
+      z.string().min(1),
+      desktopLocalHttpPluginJoinTemplateSchema,
+      desktopLocalHttpPluginFirstTemplateSchema,
+    ]),
+  );
 
 const desktopLocalHttpPluginResponsePaginationSchema = z.object({
   kind: z.literal("link_header_cursor"),
@@ -47,7 +68,7 @@ const desktopLocalHttpPluginResponseSchema = z.object({
 const desktopLocalHttpPluginTransportSchema = z.object({
   kind: z.literal("http"),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
-  url: z.string().min(1),
+  url: desktopLocalHttpPluginTemplateValueSchema,
   headers: z.record(z.string(), z.string()).optional(),
   query: z.record(z.string(), desktopLocalHttpPluginTemplateValueSchema).optional(),
   body: z.unknown().optional(),

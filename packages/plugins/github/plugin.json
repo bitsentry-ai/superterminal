@@ -974,7 +974,27 @@
       ],
       "referencePath": ".repos/references/plugins/stackstorm-github/actions/get_contents.yaml",
       "transport": {
-        "kind": "builtin"
+        "kind": "http",
+        "method": "GET",
+        "url": {
+          "kind": "join",
+          "values": [
+            "{{auth.baseUrl}}/repos/{{input.owner}}/{{input.repo}}/contents",
+            "/{{input.path}}"
+          ],
+          "separator": ""
+        },
+        "headers": {
+          "Authorization": "Bearer {{auth.token}}",
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        },
+        "query": {
+          "ref": "{{input.ref}}"
+        },
+        "successStatusCodes": [
+          200
+        ]
       }
     },
     {
@@ -1173,7 +1193,30 @@
       ],
       "referencePath": ".repos/references/plugins/stackstorm-github/actions/get_user.yaml",
       "transport": {
-        "kind": "builtin"
+        "kind": "http",
+        "method": "GET",
+        "url": {
+          "kind": "join",
+          "values": [
+            "{{auth.baseUrl}}",
+            {
+              "kind": "first",
+              "values": [
+                "/users/{{input.username}}",
+                "/user"
+              ]
+            }
+          ],
+          "separator": ""
+        },
+        "headers": {
+          "Authorization": "Bearer {{auth.token}}",
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        },
+        "successStatusCodes": [
+          200
+        ]
       }
     },
     {

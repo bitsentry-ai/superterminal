@@ -53,6 +53,11 @@ type JoinTransportTemplate = {
   separator?: string;
 };
 
+type FirstTransportTemplate = {
+  kind: "first";
+  values: unknown[];
+};
+
 const githubScaffoldActions = new Map(
   githubScaffold.actions.map((action) => [action.id, action] as const),
 );
@@ -234,6 +239,33 @@ function renderTransportTemplateValue(
   template: unknown,
   context: TemplateContext,
 ): unknown {
+  if (isFirstTransportTemplate(template)) {
+    for (const value of template.values) {
+      const rendered = renderTransportTemplateValue(value, context);
+      if (rendered === undefined || rendered === null) {
+        continue;
+      }
+
+      if (Array.isArray(rendered)) {
+        if (rendered.length > 0) {
+          return rendered;
+        }
+        continue;
+      }
+
+      if (typeof rendered === "string") {
+        if (rendered.trim().length > 0) {
+          return rendered;
+        }
+        continue;
+      }
+
+      return rendered;
+    }
+
+    return undefined;
+  }
+
   if (isJoinTransportTemplate(template)) {
     const values = template.values;
     const separator = typeof template.separator === "string" ? template.separator : " ";
@@ -297,6 +329,16 @@ function isJoinTransportTemplate(template: unknown): template is JoinTransportTe
     typeof template === "object" &&
     !Array.isArray(template) &&
     (template as { kind?: unknown }).kind === "join" &&
+    Array.isArray((template as { values?: unknown }).values)
+  );
+}
+
+function isFirstTransportTemplate(template: unknown): template is FirstTransportTemplate {
+  return (
+    template !== null &&
+    typeof template === "object" &&
+    !Array.isArray(template) &&
+    (template as { kind?: unknown }).kind === "first" &&
     Array.isArray((template as { values?: unknown }).values)
   );
 }
@@ -1128,7 +1170,7 @@ function createLocalHttpPluginAction(
         auth: context.auth,
         input,
       };
-      const resolvedUrl = renderTemplateValue(
+      const resolvedUrl = renderTransportTemplateValue(
         transport.url,
         templateContext,
       );
