@@ -18,6 +18,7 @@ const HANDLER_CHANNELS = [
   'plugins:getStoredAuth',
   'plugins:updateStoredAuth',
   'plugins:clearStoredAuth',
+  'plugins:installFromArchive',
   'plugins:execute',
   'errorSources:getAll',
   'errorSources:getOne',

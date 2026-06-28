@@ -8,9 +8,15 @@ import type {
   DesktopPluginExecutionRequest,
   DesktopPluginExecutionResult,
   DesktopPluginFieldDefinition,
+  DesktopPluginInstallFromArchiveRequest,
+  DesktopPluginInstallFromArchiveResult,
   DesktopPluginInstallResult,
 } from "./plugins.types";
-import { desktopCodePluginSchema } from "./plugins.types";
+import {
+  desktopCodePluginSchema,
+  desktopPluginInstallFromArchiveRequestSchema,
+  desktopPluginInstallFromArchiveResultSchema,
+} from "./plugins.types";
 import {
   NOOP_DESKTOP_PLUGIN_STORED_AUTH_STORE,
   type DesktopPluginStoredAuthRecord,
@@ -334,31 +340,69 @@ class DesktopNodePluginRuntimeService extends DesktopPluginRuntimeService {
     this.reloadRegistry();
   }
 
+  private resolveInstallRoot(installRoot: string | undefined): string {
+    if (installRoot !== undefined) {
+      return installRoot;
+    }
+
+    const localPluginDirectory = this.localPluginDirectories[0];
+    if (localPluginDirectory !== undefined) {
+      return localPluginDirectory;
+    }
+
+    return path.join(process.cwd(), ".bitsentry", "plugins");
+  }
+
+  private installArchiveBytes(input: {
+    archive: Uint8Array;
+    installRoot?: string;
+  }): Promise<DesktopPluginInstallResult> {
+    return installPluginFromArchive({
+      archive: Buffer.from(input.archive),
+      installRoot: this.resolveInstallRoot(input.installRoot),
+    });
+  }
+
   private reloadRegistry(): void {
     this.registry = new DesktopPluginRegistry(
       loadDesktopLocalPlugins(this.localPluginDirectories),
       {
         localPluginDirectories: this.localPluginDirectories,
-        installPluginFromArchive: ({ archive, installRoot }) => {
-          let resolvedInstallRoot = installRoot;
-          if (resolvedInstallRoot === undefined) {
-            resolvedInstallRoot = this.localPluginDirectories[0];
-          }
-          if (resolvedInstallRoot === undefined) {
-            resolvedInstallRoot = path.join(process.cwd(), ".bitsentry", "plugins");
-          }
-
-          return installPluginFromArchive({
-            archive: Buffer.from(archive),
-            installRoot: resolvedInstallRoot,
-          });
-        },
+        installPluginFromArchive: (input) => this.installArchiveBytes(input),
         reloadPlugins: () => {
           this.reloadRegistry();
           return Promise.resolve();
         },
       },
     );
+  }
+
+  override async installFromArchive(
+    input: DesktopPluginInstallFromArchiveRequest,
+  ): Promise<DesktopPluginInstallFromArchiveResult> {
+    const request = desktopPluginInstallFromArchiveRequestSchema.parse(input);
+    const archive = Buffer.from(request.archiveBase64, "base64");
+    if (archive.length === 0) {
+      throw new Error("Plugin archive payload is empty.");
+    }
+
+    const installResult = await this.installArchiveBytes({
+      archive,
+      installRoot: request.installRoot,
+    });
+    this.reloadRegistry();
+
+    const descriptor = this.getPlugin(installResult.pluginId);
+    if (descriptor === null) {
+      throw new Error(
+        `Installed plugin "${installResult.pluginId}" could not be loaded.`,
+      );
+    }
+
+    return desktopPluginInstallFromArchiveResultSchema.parse({
+      ...installResult,
+      descriptor,
+    });
   }
 
   override async executeAction(

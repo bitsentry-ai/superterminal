@@ -281,6 +281,26 @@ export const desktopPluginDescriptorSchema = z.object({
 
 export type DesktopPluginDescriptor = z.infer<typeof desktopPluginDescriptorSchema>;
 
+export const desktopPluginInstallFromArchiveRequestSchema = z.object({
+  archiveBase64: z.string().min(1),
+  installRoot: z.string().min(1).optional(),
+});
+
+export type DesktopPluginInstallFromArchiveRequest = z.infer<
+  typeof desktopPluginInstallFromArchiveRequestSchema
+>;
+
+export const desktopPluginInstallFromArchiveResultSchema = z.object({
+  pluginId: z.string().min(1),
+  installedPath: z.string().min(1),
+  extractedEntryPath: z.string().min(1),
+  descriptor: desktopPluginDescriptorSchema,
+});
+
+export type DesktopPluginInstallFromArchiveResult = z.infer<
+  typeof desktopPluginInstallFromArchiveResultSchema
+>;
+
 export const desktopPluginExecutionRequestSchema = z.object({
   pluginId: z.string().min(1),
   actionId: z.string().min(1),

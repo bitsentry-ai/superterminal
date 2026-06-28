@@ -7,6 +7,8 @@ import type {
   DesktopPluginExecutionResult,
   DesktopPluginFieldDefinition,
   DesktopPluginDescriptor,
+  DesktopPluginInstallFromArchiveRequest,
+  DesktopPluginInstallFromArchiveResult,
 } from "./plugins.types";
 import {
   desktopPluginExecutionRequestSchema,
@@ -226,6 +228,15 @@ export class DesktopPluginRuntimeService {
 
   getPlugin(pluginId: string): DesktopPluginDescriptor | null {
     return this.registry.get(pluginId);
+  }
+
+  installFromArchive(
+    request: DesktopPluginInstallFromArchiveRequest,
+  ): Promise<DesktopPluginInstallFromArchiveResult> {
+    void request;
+    return Promise.reject(
+      new Error("Plugin installation is not available in this runtime."),
+    );
   }
 
   async executeAction(

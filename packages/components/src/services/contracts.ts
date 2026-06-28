@@ -681,6 +681,18 @@ export interface PluginActionExecutionResult {
   data?: unknown;
 }
 
+export interface PluginInstallFromArchiveInput {
+  archiveBase64: string;
+  installRoot?: string;
+}
+
+export interface PluginInstallFromArchiveResult {
+  pluginId: string;
+  installedPath: string;
+  extractedEntryPath: string;
+  descriptor: PluginDescriptor;
+}
+
 export type PluginStoredAuthRecord = Record<string, unknown>;
 
 export interface PluginsServicePort {
@@ -692,6 +704,9 @@ export interface PluginsServicePort {
     auth: PluginStoredAuthRecord,
   ): Promise<PluginStoredAuthRecord>;
   clearStoredAuth(pluginId: string): Promise<void>;
+  installFromArchive(
+    input: PluginInstallFromArchiveInput,
+  ): Promise<PluginInstallFromArchiveResult>;
   execute(input: {
     pluginId: string;
     actionId: string;
