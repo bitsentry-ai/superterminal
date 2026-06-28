@@ -83,11 +83,6 @@ export class ErrorSourceProviderFactory {
   }
 
   private hasIssueProviderActions(plugin: DesktopPluginDescriptor): boolean {
-    const sourceType = plugin.metadata?.errorSource?.sourceType
-    if (sourceType === 'sentry' || sourceType === 'posthog') {
-      return true
-    }
-
     const providerActions = plugin.metadata?.errorSource?.providerActions
     if (providerActions === undefined) {
       return false
