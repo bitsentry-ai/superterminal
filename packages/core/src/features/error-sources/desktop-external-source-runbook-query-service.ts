@@ -328,15 +328,102 @@ function readPluginIssueBatch(data: unknown): {
   }
 
   const rawIssues = (data as { issues?: unknown }).issues;
-  const issues = Array.isArray(rawIssues) ? rawIssues : null;
-  if (issues === null) {
+  if (!Array.isArray(rawIssues)) {
     return null;
   }
 
   return {
-    issues,
+    issues: rawIssues,
     hasMore: (data as { hasMore?: unknown }).hasMore === true,
   };
+}
+
+function readTrimmedRecordString(
+  record: Record<string, unknown>,
+  key: string,
+): string | null {
+  const value = record[key];
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function readFirstTrimmedRecordString(
+  record: Record<string, unknown>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = readTrimmedRecordString(record, key);
+    if (value !== null) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function readGenericPluginIssueTitle(
+  record: Record<string, unknown>,
+  index: number,
+): string {
+  const title = readFirstTrimmedRecordString(record, [
+    "title",
+    "message",
+    "name",
+  ]);
+  if (title !== null) {
+    return title;
+  }
+
+  return `Item ${String(index + 1)}`;
+}
+
+function formatGenericPluginIssueLine(issue: unknown, index: number): string {
+  if (issue === null || typeof issue !== "object" || Array.isArray(issue)) {
+    return `${String(index + 1)}. ${JSON.stringify(issue)}`;
+  }
+
+  const record = issue as Record<string, unknown>;
+  const fragments = [readGenericPluginIssueTitle(record, index)];
+  const identifier = readFirstTrimmedRecordString(record, ["id", "issueId"]);
+  if (identifier !== null) {
+    fragments.push(`#${identifier}`);
+  }
+
+  const project = readFirstTrimmedRecordString(record, [
+    "projectIdentifier",
+    "projectId",
+  ]);
+  if (project !== null) {
+    fragments.push(`project=${project}`);
+  }
+
+  return `${String(index + 1)}. ${fragments.join(" - ")}`;
+}
+
+function readOptionalPluginOutput(data: unknown): string | undefined {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    return undefined;
+  }
+
+  const output = (data as { output?: unknown }).output;
+  if (typeof output !== "string") {
+    return undefined;
+  }
+
+  const normalized = output.trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  return normalized;
 }
 
 function formatGenericPluginQueryResults(input: {
@@ -346,49 +433,19 @@ function formatGenericPluginQueryResults(input: {
   hasMore: boolean;
   limit: number;
 }): string {
+  let resultCount = String(input.issues.length);
+  if (input.hasMore) {
+    resultCount = `${resultCount}+`;
+  }
+
   const lines = [
     `Source: ${input.source.name} (${input.source.sourceType})`,
     `Query: ${input.query}`,
-    `Results: ${String(input.issues.length)}${input.hasMore ? "+" : ""}`,
+    `Results: ${resultCount}`,
   ];
 
   for (const [index, issue] of input.issues.slice(0, input.limit).entries()) {
-    if (issue === null || typeof issue !== "object" || Array.isArray(issue)) {
-      lines.push(`${String(index + 1)}. ${JSON.stringify(issue)}`);
-      continue;
-    }
-
-    const record = issue as Record<string, unknown>;
-    const title =
-      (typeof record.title === "string" && record.title.trim().length > 0
-        ? record.title.trim()
-        : typeof record.message === "string" && record.message.trim().length > 0
-          ? record.message.trim()
-          : typeof record.name === "string" && record.name.trim().length > 0
-            ? record.name.trim()
-            : `Item ${String(index + 1)}`);
-    const identifier =
-      typeof record.id === "string" && record.id.trim().length > 0
-        ? record.id.trim()
-        : typeof record.issueId === "string" && record.issueId.trim().length > 0
-          ? record.issueId.trim()
-          : null;
-    const project =
-      typeof record.projectIdentifier === "string" &&
-      record.projectIdentifier.trim().length > 0
-        ? record.projectIdentifier.trim()
-        : typeof record.projectId === "string" && record.projectId.trim().length > 0
-          ? record.projectId.trim()
-          : null;
-
-    const fragments = [title];
-    if (identifier !== null) {
-      fragments.push(`#${identifier}`);
-    }
-    if (project !== null) {
-      fragments.push(`project=${project}`);
-    }
-    lines.push(`${String(index + 1)}. ${fragments.join(" - ")}`);
+    lines.push(formatGenericPluginIssueLine(issue, index));
   }
 
   return lines.join("\n");
@@ -430,17 +487,9 @@ function executeCustomPluginQuery(args: {
       auth,
       input,
     }).then((result) => {
-      const output = (
-        result.data !== null &&
-        typeof result.data === "object" &&
-        !Array.isArray(result.data) &&
-        typeof (result.data as { output?: unknown }).output === "string"
-      )
-        ? ((result.data as { output: string }).output.trim())
-        : undefined;
       const page = readPluginIssueBatch(result.data);
       return {
-        output,
+        output: readOptionalPluginOutput(result.data),
         issues: page?.issues,
         hasMore: page?.hasMore,
       };
@@ -550,6 +599,14 @@ export class ExternalSourceRunbookQueryService
       this.options?.defaultLimit ?? DEFAULT_EXTERNAL_SOURCE_QUERY_LIMIT;
     const indexPattern = readWazuhIndexPattern(source.configuration);
     const pluginId = readSourcePluginId(source);
+    const pluginInput: Record<string, unknown> = {
+      query,
+      limit,
+    };
+    if (indexPattern !== undefined) {
+      pluginInput.indexPattern = indexPattern;
+    }
+
     const result = await this.pluginRuntime.executeAction({
       pluginId,
       actionId: resolveErrorSourceProviderActionId({
@@ -559,11 +616,7 @@ export class ExternalSourceRunbookQueryService
         action: "searchAlerts",
       }),
       auth: buildWazuhPluginAuth(source),
-      input: {
-        query,
-        limit,
-        ...(indexPattern === undefined ? {} : { indexPattern }),
-      },
+      input: pluginInput,
     });
 
     return readPluginOutput(result.data);
