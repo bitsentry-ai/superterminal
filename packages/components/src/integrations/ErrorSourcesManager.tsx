@@ -183,18 +183,6 @@ function readPluginErrorSourceType(
   return plugin.metadata?.errorSource?.sourceType ?? null;
 }
 
-function readPluginErrorSourceSetupField(
-  plugin: PluginDescriptor | null,
-  target: PluginErrorSourceSetupField["target"],
-): PluginErrorSourceSetupField | null {
-  const setupFields = plugin?.metadata?.errorSource?.setupFields;
-  if (setupFields === undefined) {
-    return null;
-  }
-
-  return setupFields.find((field) => field.target === target) ?? null;
-}
-
 function formatSetupFieldRequiredMessage(label: string): string {
   return `${label} is required.`;
 }
@@ -232,14 +220,6 @@ function findEditDialogPlugin(
   }
 
   return findPluginDescriptorForSource(plugins, source);
-}
-
-function baseUrlLabelKey(sourceType: ErrorSourceType): string {
-  if (sourceType === "posthog") {
-    return "common.errorSourcesManager.labelPosthogHost";
-  }
-
-  return "common.errorSourcesManager.labelApiBaseUrl";
 }
 
 function emptySourcePrompt(
@@ -282,6 +262,15 @@ function editSetupFieldPlaceholder(
   }
 
   return field.placeholder ?? "";
+}
+
+function isListSetupField(field: PluginErrorSourceSetupField): boolean {
+  return (
+    field.control === "multiline_list" ||
+    field.target === "projectSlugs" ||
+    field.target === "projectIds" ||
+    field.target === "indexPatterns"
+  );
 }
 
 function readArrayDisplayValue(value: unknown): string {
@@ -657,34 +646,6 @@ export default function ErrorSourcesManager({
     () => selectedPlugin?.metadata?.errorSource?.setupFields ?? [],
     [selectedPlugin],
   );
-  const authSetupField = useMemo(
-    () => readPluginErrorSourceSetupField(selectedPlugin, "authToken"),
-    [selectedPlugin],
-  );
-  const baseUrlSetupField = useMemo(
-    () => readPluginErrorSourceSetupField(selectedPlugin, "baseUrl"),
-    [selectedPlugin],
-  );
-  const orgSetupField = useMemo(
-    () =>
-      readPluginErrorSourceSetupField(selectedPlugin, "organizationSlug") ??
-      readPluginErrorSourceSetupField(selectedPlugin, "organizationId"),
-    [selectedPlugin],
-  );
-  const projectsSetupField = useMemo(
-    () =>
-      readPluginErrorSourceSetupField(selectedPlugin, "projectSlugs") ??
-      readPluginErrorSourceSetupField(selectedPlugin, "projectIds"),
-    [selectedPlugin],
-  );
-  const indexPatternsSetupField = useMemo(
-    () => readPluginErrorSourceSetupField(selectedPlugin, "indexPatterns"),
-    [selectedPlugin],
-  );
-  const customSetupFields = useMemo(
-    () => selectedSetupFields.filter((field) => field.target === undefined),
-    [selectedSetupFields],
-  );
   const editDialogPlugin = useMemo(
     () => findEditDialogPlugin(plugins, editDialogSource),
     [editDialogSource, plugins],
@@ -784,6 +745,68 @@ export default function ErrorSourcesManager({
     }
   }
 
+  function readSetupFieldInputValue(
+    field: PluginErrorSourceSetupField,
+  ): string {
+    switch (field.target) {
+      case "authToken":
+        return authToken;
+      case "organizationSlug":
+      case "organizationId":
+        return advancedOrgInput;
+      case "projectSlugs":
+      case "projectIds":
+        return advancedProjectsInput;
+      case "baseUrl":
+        if (field.control === "posthog_base_url") {
+          if (posthogBaseUrlMode === "custom") {
+            return posthogCustomBaseUrl;
+          }
+          return getPosthogResolvedBaseUrl();
+        }
+        return wazuhBaseUrl;
+      case "indexPatterns":
+        return indexPatternsText;
+      default:
+        return customSetupFieldValues[field.key] ?? "";
+    }
+  }
+
+  function setSetupFieldInputValue(
+    field: PluginErrorSourceSetupField,
+    nextValue: string,
+  ): void {
+    switch (field.target) {
+      case "authToken":
+        setAuthToken(nextValue);
+        break;
+      case "organizationSlug":
+      case "organizationId":
+        setAdvancedOrgInput(nextValue);
+        break;
+      case "projectSlugs":
+      case "projectIds":
+        setAdvancedProjectsInput(nextValue);
+        break;
+      case "baseUrl":
+        if (field.control === "posthog_base_url") {
+          setPosthogCustomBaseUrl(nextValue);
+        } else {
+          setWazuhBaseUrl(nextValue);
+        }
+        break;
+      case "indexPatterns":
+        setIndexPatternsText(nextValue);
+        break;
+      default:
+        setCustomSetupFieldValues((current) => ({
+          ...current,
+          [field.key]: nextValue,
+        }));
+        break;
+    }
+  }
+
   function readCreateSourceValidationError(
     trimmedName: string,
   ): string | null {
@@ -809,12 +832,7 @@ export default function ErrorSourcesManager({
         continue;
       }
 
-      if (
-        field.control === "multiline_list" ||
-        field.target === "projectSlugs" ||
-        field.target === "projectIds" ||
-        field.target === "indexPatterns"
-      ) {
+      if (isListSetupField(field)) {
         if (readSetupFieldListValue(field).length === 0) {
           return formatSetupFieldRequiredMessage(field.label);
         }
@@ -844,12 +862,7 @@ export default function ErrorSourcesManager({
     };
 
     for (const field of selectedSetupFields) {
-      if (
-        field.control === "multiline_list" ||
-        field.target === "projectSlugs" ||
-        field.target === "projectIds" ||
-        field.target === "indexPatterns"
-      ) {
+      if (isListSetupField(field)) {
         setupValues[field.key] = readSetupFieldListValue(field);
       } else {
         const value = readSetupFieldTextValue(field);
@@ -1011,12 +1024,7 @@ export default function ErrorSourcesManager({
         continue;
       }
 
-      if (
-        field.control === "multiline_list" ||
-        field.target === "projectSlugs" ||
-        field.target === "projectIds" ||
-        field.target === "indexPatterns"
-      ) {
+      if (isListSetupField(field)) {
         if (readEditSetupFieldListValue(field).length === 0) {
           return formatSetupFieldRequiredMessage(field.label);
         }
@@ -1045,12 +1053,7 @@ export default function ErrorSourcesManager({
     const setupFields = plugin?.metadata?.errorSource?.setupFields ?? [];
     const setupValues: Record<string, unknown> = {};
     for (const field of setupFields) {
-      if (
-        field.control === "multiline_list" ||
-        field.target === "projectSlugs" ||
-        field.target === "projectIds" ||
-        field.target === "indexPatterns"
-      ) {
+      if (isListSetupField(field)) {
         const value = readEditSetupFieldListValue(field);
         if (value.length === 0) {
           continue;
@@ -1212,49 +1215,87 @@ export default function ErrorSourcesManager({
     posthogBaseUrlValue = posthogCustomBaseUrl;
   }
 
-  let authLabelKey = "common.errorSourcesManager.labelAuthToken";
-  let authPlaceholderKey = "common.errorSourcesManager.sentryAuthToken";
-  let orgPlaceholderKey = "common.errorSourcesManager.organizationSlug";
-  let projectsLabelKey = "common.errorSourcesManager.labelProjectsOptional";
-  let projectsPlaceholderKey =
-    "common.errorSourcesManager.projectSlugsCommaOrNewline";
-  if (sourceType === "posthog") {
-    authLabelKey = "common.errorSourcesManager.labelApiKey";
-    authPlaceholderKey = "common.errorSourcesManager.posthogApiToken";
-    orgPlaceholderKey = "common.errorSourcesManager.posthogOrganizationId";
-    projectsLabelKey = "common.errorSourcesManager.labelProjects";
-    projectsPlaceholderKey = "common.errorSourcesManager.posthogProjectIds";
+  function renderCreateSetupField(
+    field: PluginErrorSourceSetupField,
+  ): ReactNode {
+    const description = setupFieldDescription(field);
+
+    if (field.target === "baseUrl" && field.control === "posthog_base_url") {
+      return (
+        <div key={field.key} className="space-y-1">
+          <FieldLabel required={field.required}>
+            {field.label}
+          </FieldLabel>
+          <div className="grid gap-2 md:grid-cols-[8rem_1fr]">
+            <div className="relative">
+              <select
+                className="h-9 w-full appearance-none rounded-md border bg-background pl-3 pr-8 text-sm"
+                value={posthogBaseUrlMode}
+                onChange={(event) => {
+                  setPosthogBaseUrlMode(
+                    event.target.value as "us" | "eu" | "custom",
+                  );
+                }}
+                aria-label={t("common.errorSourcesManager.posthogApiBase")}
+              >
+                <option value="us">
+                  {t("common.errorSourcesManager.regionUs")}
+                </option>
+                <option value="eu">
+                  {t("common.errorSourcesManager.regionEu")}
+                </option>
+                <option value="custom">
+                  {t("common.errorSourcesManager.regionCustom")}
+                </option>
+              </select>
+              <SelectChevron />
+            </div>
+            <Input
+              placeholder={
+                field.placeholder ??
+                t(
+                  "common.errorSourcesManager.posthogApiBaseCustomPlaceholder",
+                )
+              }
+              value={posthogBaseUrlValue}
+              onChange={(event) => {
+                setSetupFieldInputValue(field, event.target.value);
+              }}
+              readOnly={posthogBaseUrlMode !== "custom"}
+              disabled={posthogBaseUrlMode !== "custom"}
+            />
+          </div>
+          {description.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {description}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div key={field.key} className="space-y-1">
+        <FieldLabel required={field.required}>
+          {field.label}
+        </FieldLabel>
+        <Input
+          placeholder={field.placeholder ?? ""}
+          type={setupFieldInputType(field)}
+          value={readSetupFieldInputValue(field)}
+          onChange={(event) => {
+            setSetupFieldInputValue(field, event.target.value);
+          }}
+        />
+        {description.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {description}
+          </p>
+        )}
+      </div>
+    );
   }
-  const authLabel = authSetupField?.label ?? t(authLabelKey);
-  const authPlaceholder =
-    authSetupField?.placeholder ?? t(authPlaceholderKey);
-  const authDescription = authSetupField?.description;
-  const orgLabel =
-    orgSetupField?.label ?? t("common.errorSourcesManager.labelOrganization");
-  const orgPlaceholder =
-    orgSetupField?.placeholder ?? t(orgPlaceholderKey);
-  const orgDescription = orgSetupField?.description;
-  const orgRequired = orgSetupField?.required ?? sourceType === "sentry";
-  const projectsLabel = projectsSetupField?.label ?? t(projectsLabelKey);
-  const projectsPlaceholder =
-    projectsSetupField?.placeholder ?? t(projectsPlaceholderKey);
-  const projectsDescription = projectsSetupField?.description;
-  const projectsRequired =
-    projectsSetupField?.required ?? sourceType === "posthog";
-  const baseUrlLabel =
-    baseUrlSetupField?.label ??
-    t(baseUrlLabelKey(sourceType));
-  const baseUrlDescription = baseUrlSetupField?.description;
-  const baseUrlPlaceholder =
-    baseUrlSetupField?.placeholder ??
-    t("common.errorSourcesManager.wazuhBaseUrlOptional");
-  const indexPatternsLabel =
-    indexPatternsSetupField?.label ??
-    t("common.errorSourcesManager.labelIndexPatterns");
-  const indexPatternsPlaceholder =
-    indexPatternsSetupField?.placeholder ??
-    t("common.errorSourcesManager.wazuhAlerts");
-  const indexPatternsDescription = indexPatternsSetupField?.description;
+
   const createSourceDisabled =
     actionLoading || readCreateSourceValidationError(sourceName.trim()) !== null;
 
@@ -1537,194 +1578,13 @@ export default function ErrorSourcesManager({
                 aria-hidden={showAdvanced}
               >
                 <div className="space-y-3">
-                  {sourceType === "wazuh" && (
-                    <>
-                      <div className="space-y-1">
-                        <FieldLabel required>
-                          {baseUrlLabel}
-                        </FieldLabel>
-                        <Input
-                          placeholder={baseUrlPlaceholder}
-                          value={wazuhBaseUrl}
-                          onChange={(e) => { setWazuhBaseUrl(e.target.value); }}
-                        />
-                        {baseUrlDescription && (
-                          <p className="text-xs text-muted-foreground">
-                            {baseUrlDescription}
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <FieldLabel required>
-                          {authLabel}
-                        </FieldLabel>
-                        <Input
-                          placeholder={authPlaceholder}
-                          type="password"
-                          value={authToken}
-                          onChange={(e) => { setAuthToken(e.target.value); }}
-                        />
-                        {authDescription && (
-                          <p className="text-xs text-muted-foreground">
-                            {authDescription}
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <FieldLabel>
-                          {indexPatternsLabel}
-                        </FieldLabel>
-                        <Input
-                          placeholder={indexPatternsPlaceholder}
-                          value={indexPatternsText}
-                          onChange={(e) => { setIndexPatternsText(e.target.value); }}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {indexPatternsDescription ??
-                            t("common.errorSourcesManager.indexPatternsHelp")}
-                        </p>
-                      </div>
-                    </>
+                  {selectedSetupFields.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      This code plugin does not require connection fields.
+                    </p>
                   )}
-                  {sourceType !== "wazuh" && (
-                    <>
-                      {sourceType === "posthog" && (
-                        <div className="space-y-1">
-                          <FieldLabel required>
-                            {baseUrlLabel}
-                          </FieldLabel>
-                          <div className="grid gap-2 md:grid-cols-[8rem_1fr]">
-                            <div className="relative">
-                              <select
-                                className="h-9 w-full appearance-none rounded-md border bg-background pl-3 pr-8 text-sm"
-                                value={posthogBaseUrlMode}
-                                onChange={(e) =>
-                                  { setPosthogBaseUrlMode(
-                                    e.target.value as "us" | "eu" | "custom",
-                                  ); }
-                                }
-                                aria-label={t(
-                                  "common.errorSourcesManager.posthogApiBase",
-                                )}
-                              >
-                                <option value="us">
-                                  {t("common.errorSourcesManager.regionUs")}
-                                </option>
-                                <option value="eu">
-                                  {t("common.errorSourcesManager.regionEu")}
-                                </option>
-                                <option value="custom">
-                                  {t("common.errorSourcesManager.regionCustom")}
-                                </option>
-                              </select>
-                              <SelectChevron />
-                            </div>
-                            <Input
-                              placeholder={
-                                baseUrlSetupField?.placeholder ??
-                                t(
-                                  "common.errorSourcesManager.posthogApiBaseCustomPlaceholder",
-                                )
-                              }
-                              value={posthogBaseUrlValue}
-                              onChange={(e) =>
-                                { setPosthogCustomBaseUrl(e.target.value); }
-                              }
-                              readOnly={posthogBaseUrlMode !== "custom"}
-                              disabled={posthogBaseUrlMode !== "custom"}
-                            />
-                          </div>
-                          {baseUrlDescription && (
-                            <p className="text-xs text-muted-foreground">
-                              {baseUrlDescription}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="space-y-1">
-                        <FieldLabel required>
-                          {authLabel}
-                        </FieldLabel>
-                        <Input
-                          placeholder={authPlaceholder}
-                          type="password"
-                          value={authToken}
-                          onChange={(e) => { setAuthToken(e.target.value); }}
-                        />
-                        {authDescription && (
-                          <p className="text-xs text-muted-foreground">
-                            {authDescription}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-1">
-                        <FieldLabel required={orgRequired}>
-                          {orgLabel}
-                        </FieldLabel>
-                        <Input
-                          placeholder={orgPlaceholder}
-                          value={advancedOrgInput}
-                          onChange={(e) => { setAdvancedOrgInput(e.target.value); }}
-                        />
-                        {orgDescription && (
-                          <p className="text-xs text-muted-foreground">
-                            {orgDescription}
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <FieldLabel required={projectsRequired}>
-                          {projectsLabel}
-                        </FieldLabel>
-                        <Input
-                          placeholder={projectsPlaceholder}
-                          value={advancedProjectsInput}
-                          onChange={(e) =>
-                            { setAdvancedProjectsInput(e.target.value); }
-                          }
-                          required={projectsRequired}
-                        />
-                        {projectsDescription && (
-                          <p className="text-xs text-muted-foreground">
-                            {projectsDescription}
-                          </p>
-                        )}
-                      </div>
-                    </>
-                  )}
-                  {customSetupFields.length > 0 && (
-                    <>
-                      {customSetupFields.map((field) => {
-                        const value = customSetupFieldValues[field.key] ?? "";
-                        const placeholder = field.placeholder ?? "";
-                        const description = setupFieldDescription(field);
-
-                        return (
-                          <div key={field.key} className="space-y-1">
-                            <FieldLabel required={field.required}>
-                              {field.label}
-                            </FieldLabel>
-                            <Input
-                              placeholder={placeholder}
-                              type={setupFieldInputType(field)}
-                              value={value}
-                              onChange={(e) => {
-                                const nextValue = e.target.value;
-                                setCustomSetupFieldValues((current) => ({
-                                  ...current,
-                                  [field.key]: nextValue,
-                                }));
-                              }}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {description}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </>
+                  {selectedSetupFields.map((field) =>
+                    renderCreateSetupField(field),
                   )}
                 </div>
 
