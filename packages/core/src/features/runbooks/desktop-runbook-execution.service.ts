@@ -1420,10 +1420,12 @@ export class RunbookExecutionService {
     try {
       parsed = JSON.parse(trimmed)
     } catch (error) {
+      let message = String(error)
+      if (error instanceof Error) {
+        message = error.message
+      }
       throw new Error(
-        `${fieldLabel} must resolve to a valid JSON object: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `${fieldLabel} must resolve to a valid JSON object: ${message}`,
       )
     }
 
@@ -1457,13 +1459,17 @@ export class RunbookExecutionService {
 
     if (typeof data === 'string') {
       const trimmed = data.trim()
-      return trimmed.length > 0 ? trimmed : undefined
+      if (trimmed.length === 0) {
+        return undefined
+      }
+
+      return trimmed
     }
 
     try {
       return JSON.stringify(data, null, 2)
     } catch {
-      return String(data)
+      return `[unserializable plugin result: ${Object.prototype.toString.call(data)}]`
     }
   }
 

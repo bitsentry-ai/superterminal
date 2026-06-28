@@ -1080,6 +1080,26 @@ function parseIncomingRunbookAction(
 
 function toRunbookAction(raw: Record<string, unknown>): DesktopRunbookActionRecord {
   const type = normalizeRunbookActionType(raw.type);
+  const isPluginAction = type === "plugin";
+  let url = asOptionalString(raw.url);
+  let body = asOptionalString(raw.body);
+  let pluginId: string | undefined;
+  let pluginActionId: string | undefined;
+  let pluginInput: string | undefined;
+  let pluginAuth: string | undefined;
+  let query = asOptionalString(raw.query);
+  let sourceId = asOptionalString(raw.sourceId);
+  if (isPluginAction) {
+    url = undefined;
+    body = undefined;
+    pluginId = asOptionalString(raw.sourceId);
+    pluginActionId = asOptionalString(raw.query);
+    pluginInput = asOptionalString(raw.body);
+    pluginAuth = asOptionalString(raw.url);
+    query = undefined;
+    sourceId = undefined;
+  }
+
   return sanitizeRunbookAction({
     id: asString(raw.id),
     type,
@@ -1088,17 +1108,16 @@ function toRunbookAction(raw: Record<string, unknown>): DesktopRunbookActionReco
     prompt: asOptionalString(raw.prompt),
     llmProviderKey: parseRunbookLlmProviderKey(raw.llmProviderKey),
     llmModel: asOptionalString(raw.llmModel),
-    url: type === "plugin" ? undefined : asOptionalString(raw.url),
+    url,
     method: parseRunbookHttpMethod(raw.method),
     headers: parseRunbookHeaders(raw.headersJson ?? raw.headers),
-    body: type === "plugin" ? undefined : asOptionalString(raw.body),
-    pluginId: type === "plugin" ? asOptionalString(raw.sourceId) : undefined,
-    pluginActionId:
-      type === "plugin" ? asOptionalString(raw.query) : undefined,
-    pluginInput: type === "plugin" ? asOptionalString(raw.body) : undefined,
-    pluginAuth: type === "plugin" ? asOptionalString(raw.url) : undefined,
-    query: type === "plugin" ? undefined : asOptionalString(raw.query),
-    sourceId: type === "plugin" ? undefined : asOptionalString(raw.sourceId),
+    body,
+    pluginId,
+    pluginActionId,
+    pluginInput,
+    pluginAuth,
+    query,
+    sourceId,
     parameters: parseRunbookParameters(raw.parametersJson ?? raw.parameters),
     logFilter: parseRunbookLogFilter(raw.logFilterJson ?? raw.logFilter),
     telemetryConfig: parseTelemetryConfig(

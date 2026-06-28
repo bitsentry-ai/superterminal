@@ -308,17 +308,28 @@ export function createDesktopOauthManagerBindings(
         db: DesktopOAuthSettingsDatabase,
         providerFactory: DesktopOauthManagerProviderFactory,
       ) {
+        const resolveSourceProvider = (input: {
+          sourceType: ErrorSourceType;
+          pluginId?: string;
+          providerBaseUrl?: string;
+        }): DesktopOAuthProvider => {
+          let additionalMetadata: { pluginId: string } | undefined;
+          if (input.pluginId !== undefined) {
+            additionalMetadata = { pluginId: input.pluginId };
+          }
+
+          return getProviderForSource(providerFactory, {
+            sourceType: input.sourceType,
+            additionalMetadata,
+            configuration: {
+              posthogBaseUrl: input.providerBaseUrl,
+            },
+          });
+        };
+
         super(db, {
           providerConfigs,
-          resolveProvider: ({ sourceType, pluginId, providerBaseUrl }) =>
-            getProviderForSource(providerFactory, {
-              sourceType,
-              additionalMetadata:
-                pluginId === undefined ? undefined : { pluginId },
-              configuration: {
-                posthogBaseUrl: providerBaseUrl,
-              },
-            }),
+          resolveProvider: resolveSourceProvider,
           resolvePluginDescriptor: (pluginId) =>
             providerFactory.getPlugin?.(pluginId) ?? null,
         });

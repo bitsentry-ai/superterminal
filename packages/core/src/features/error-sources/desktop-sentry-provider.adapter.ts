@@ -413,10 +413,13 @@ export class SentryProviderAdapter implements ErrorSourceProvider {
     since: string | undefined,
     until: string | undefined,
   ): string | undefined {
-    const clauses = [
-      since !== undefined && since.length > 0 ? `lastSeen:>=${since}` : undefined,
-      until !== undefined && until.length > 0 ? `lastSeen:<=${until}` : undefined,
-    ].filter((clause): clause is string => clause !== undefined)
+    const clauses: string[] = []
+    if (since !== undefined && since.length > 0) {
+      clauses.push(`lastSeen:>=${since}`)
+    }
+    if (until !== undefined && until.length > 0) {
+      clauses.push(`lastSeen:<=${until}`)
+    }
 
     if (clauses.length === 0) {
       return undefined
