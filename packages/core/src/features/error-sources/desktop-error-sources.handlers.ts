@@ -242,6 +242,46 @@ function readOAuthConfigurationOverrides(
   return overrides
 }
 
+function buildPluginOAuthConfiguration(input: {
+  payload: CompleteOAuthPayload
+  persistedSetup: PersistedPluginSetup
+  oauthClientId?: string
+  oauthClientSecret?: string
+  oauthRedirectUri?: string
+}): ErrorSourceConfiguration {
+  const configuration: ErrorSourceConfiguration = {
+    ...input.persistedSetup.configuration,
+  }
+  const baseUrl = readOptionalTrimmed(input.payload.baseUrl)
+  if (baseUrl !== undefined) {
+    configuration.baseUrl = baseUrl
+  }
+  const posthogBaseUrl = readOptionalTrimmed(input.payload.posthogBaseUrl)
+  if (posthogBaseUrl !== undefined) {
+    configuration.posthogBaseUrl = posthogBaseUrl
+  }
+  const orgSlug = readOptionalTrimmed(
+    input.payload.orgSlug ?? input.payload.organizationId,
+  )
+  if (orgSlug !== undefined) {
+    configuration.orgSlug = orgSlug
+  }
+  const projectIds = readStringArray(input.payload.projectIds)
+  if (projectIds.length > 0) {
+    configuration.projectIds = projectIds
+  }
+  const projectSlugs = readStringArray(input.payload.projectSlugs)
+  if (projectSlugs.length > 0) {
+    configuration.projectSlugs = projectSlugs
+  }
+  applyOptionalOAuthConfiguration(configuration, {
+    oauthClientId: input.oauthClientId,
+    oauthClientSecret: input.oauthClientSecret,
+    oauthRedirectUri: input.oauthRedirectUri,
+  })
+  return configuration
+}
+
 function parsePostHogExtraAllowedHosts(): string[] {
   const raw = process.env.POSTHOG_ALLOWED_BASE_URLS
   if (raw === undefined || raw.length === 0) return []
@@ -1616,6 +1656,49 @@ export function createDesktopErrorSourcesHandlers(
         const accessToken = tokenResult.accessToken.trim()
         if (accessToken.length === 0) {
           throw new Error(`Failed to resolve ${sourceType} access token`)
+        }
+
+        const usePluginOAuthCompletePath = hasMatchingErrorSourcePlugin(
+          pluginRuntime,
+          pluginId,
+          sourceType,
+        )
+        if (usePluginOAuthCompletePath) {
+          const configuration = buildPluginOAuthConfiguration({
+            payload,
+            persistedSetup,
+            oauthClientId,
+            oauthClientSecret,
+            oauthRedirectUri,
+          })
+          const source = await sourcesRepository.create({
+            sourceType,
+            name:
+              payload.name ??
+              pluginRuntime.getPlugin(pluginId)?.name ??
+              sourceType,
+            additionalMetadata: mergeErrorSourceAdditionalMetadata(
+              readPayloadRecord(payload.additionalMetadata),
+              pluginId,
+            ),
+            accessTokenRef: accessToken,
+            refreshTokenRef: tokenResult.refreshToken,
+            expiresAt: tokenResult.expiresAt,
+            grantedScopes: tokenResult.scopes,
+            configuration,
+            logLevelThreshold: toLogLevelThreshold(payload.logLevelThreshold),
+            syncEnabled: payload.syncEnabled !== false,
+            autoDiagnosisEnabled: payload.autoDiagnosisEnabled === true,
+          })
+          log.info(
+            `[error-sources] completeOAuth:success id=${source.id} type=${sourceType} plugin=${pluginId}`,
+          )
+
+          return {
+            source: toRendererErrorSource(source),
+            organizations: [],
+            projects: [],
+          }
         }
 
         if (sourceType === 'sentry') {

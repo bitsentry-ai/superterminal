@@ -53,6 +53,7 @@ function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
           },
         ],
         providerActions: {
+          exchangeCodeForToken: 'exchange_code_for_token',
           queryIssues: 'query_issues',
         },
       },
@@ -131,6 +132,20 @@ function createTestDb() {
       findUnique: vi.fn().mockResolvedValue(existingSource),
       update,
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    setting: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue({
+        key: 'errorSources.oauth.state-1',
+        value: JSON.stringify({
+          sourceType: 'posthog',
+          pluginId: 'posthog',
+          codeVerifier: 'verifier-1',
+          createdAt: now,
+        }),
+      }),
+      upsert: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue({}),
     },
   }
   return { db: db as DbClient, create, update }
@@ -287,6 +302,82 @@ describe('desktop error source handlers', () => {
     expect(JSON.parse(String(updateCall?.data.configuration))).toEqual({
       baseUrl: 'https://metadata.google.internal',
       orgSlug: 'org-1',
+      projectIds: ['999'],
+    })
+  })
+
+  it('completes OAuth for built-in-named sources through matching code plugin metadata', async () => {
+    vi.useFakeTimers()
+    const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])
+    runtime.executeActionMock.mockResolvedValue({
+      pluginId: 'posthog',
+      actionId: 'exchange_code_for_token',
+      ok: true,
+      status: 200,
+      summary: 'Exchanged OAuth code.',
+      data: {
+        accessToken: 'phx-oauth-token',
+        refreshToken: 'phr-oauth-refresh-token',
+        scope: 'error_tracking:read project:read',
+      },
+    })
+    const { db, create } = createTestDb()
+    const oauthBindings = createDesktopOauthManagerBindings(
+      'bitsentry-desktop-ce://oauth/callback',
+    )
+    const handlers = createDesktopErrorSourcesHandlers(db, {
+      OauthManagerService: oauthBindings.OauthManagerService,
+      pluginRuntime: runtime,
+    })
+
+    await expect(
+      handlers['errorSources:completeOAuth']?.({
+        pluginId: 'posthog',
+        sourceType: 'posthog',
+        code: 'code-1',
+        state: 'state-1',
+        clientId: 'client-id',
+        name: 'OAuth PostHog',
+        projectIds: ['999'],
+        baseUrl: 'https://eu.posthog.com',
+      }),
+    ).resolves.toMatchObject({
+      source: {
+        pluginId: 'posthog',
+        sourceType: 'posthog',
+        name: 'OAuth PostHog',
+        configuration: {
+          baseUrl: 'https://eu.posthog.com',
+          projectIds: ['999'],
+        },
+      },
+      organizations: [],
+      projects: [],
+    })
+
+    expect(runtime.executeActionMock).toHaveBeenCalledTimes(1)
+    const executionRequest = runtime.executeActionMock.mock.calls[0]?.[0]
+    expect(executionRequest).toMatchObject({
+      pluginId: 'posthog',
+      actionId: 'exchange_code_for_token',
+    })
+    expect(executionRequest?.input).toMatchObject({
+      code: 'code-1',
+      clientId: 'client-id',
+    })
+
+    const createCall = create.mock.calls[0]?.[0]
+    expect(createCall).toBeDefined()
+    expect(createCall?.data).toMatchObject({
+      sourceType: 'posthog',
+      name: 'OAuth PostHog',
+      accessTokenRef: 'phx-oauth-token',
+      refreshTokenRef: 'phr-oauth-refresh-token',
+      grantedScopes: JSON.stringify(['error_tracking:read', 'project:read']),
+    })
+    expect(JSON.parse(String(createCall?.data.configuration))).toEqual({
+      baseUrl: 'https://eu.posthog.com',
+      oauthClientId: 'client-id',
       projectIds: ['999'],
     })
   })
