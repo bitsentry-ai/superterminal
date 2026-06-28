@@ -244,13 +244,12 @@ function baseUrlLabelKey(sourceType: ErrorSourceType): string {
 
 function emptySourcePrompt(
   availableProviderSummary: string,
-  t: Translate,
 ): string {
   if (availableProviderSummary.length > 0) {
     return `Available plugin-backed sources: ${availableProviderSummary}.`;
   }
 
-  return t("common.errorSourcesManager.addASentryWazuhOrPostHog");
+  return "Install or enable a code plugin that declares an error source.";
 }
 
 function setupFieldInputType(field: PluginErrorSourceSetupField): string {
@@ -643,30 +642,7 @@ export default function ErrorSourcesManager({
           return left.pluginId.localeCompare(right.pluginId);
         });
 
-      if (discovered.length > 0) {
-        return discovered;
-      }
-
-      return [
-        {
-          pluginId: "sentry",
-          sourceType: "sentry" as const,
-          label: "Sentry",
-          icon: "sentry" as const,
-        },
-        {
-          pluginId: "wazuh",
-          sourceType: "wazuh" as const,
-          label: "Wazuh",
-          icon: "wazuh" as const,
-        },
-        {
-          pluginId: "posthog",
-          sourceType: "posthog" as const,
-          label: "PostHog",
-          icon: "posthog" as const,
-        },
-      ];
+      return discovered;
     },
     [plugins],
   );
@@ -817,6 +793,9 @@ export default function ErrorSourcesManager({
   ): string | null {
     if (trimmedName.length === 0) {
       return t("common.errorSourcesManager.sourceNameRequired");
+    }
+    if (selectedProviderCard === null || selectedPlugin === null) {
+      return "Select an installed code plugin first.";
     }
 
     for (const field of selectedSetupFields) {
@@ -1357,7 +1336,7 @@ export default function ErrorSourcesManager({
             {t("common.errorSourcesManager.noExternalSourcesConnected")}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {emptySourcePrompt(availableProviderSummary, t)}
+            {emptySourcePrompt(availableProviderSummary)}
           </p>
         </div>
       )}
