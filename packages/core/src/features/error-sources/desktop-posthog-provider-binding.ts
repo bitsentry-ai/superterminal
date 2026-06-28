@@ -14,6 +14,15 @@ type SourceWithPostHogConfig<TSourceType extends ErrorSourceType> = {
 
 type ProviderFactory<TSourceType extends ErrorSourceType, TProvider> = {
   getProvider(sourceType: TSourceType): TProvider;
+  getPlugin?: (
+    pluginId: string,
+  ) => {
+    metadata?: {
+      errorSource?: {
+        sourceType?: TSourceType;
+      };
+    };
+  } | null;
   getProviderForSource?: (
     source: SourceWithPostHogConfig<TSourceType>,
   ) => TProvider;
@@ -36,6 +45,41 @@ function hasWithApiBase<TProvider>(
   return (
     typeof (provider as { withApiBase?: unknown }).withApiBase === "function"
   );
+}
+
+function readPluginId(additionalMetadata: unknown): string | undefined {
+  if (
+    additionalMetadata === null ||
+    additionalMetadata === undefined ||
+    typeof additionalMetadata !== "object" ||
+    Array.isArray(additionalMetadata)
+  ) {
+    return undefined;
+  }
+
+  const pluginId = (additionalMetadata as { pluginId?: unknown }).pluginId;
+  if (typeof pluginId !== "string") {
+    return undefined;
+  }
+
+  const normalized = pluginId.trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  return normalized;
+}
+
+function hasMatchingErrorSourcePlugin<TSourceType extends ErrorSourceType>(
+  factory: ProviderFactory<TSourceType, unknown>,
+  source: SourceWithPostHogConfig<TSourceType>,
+): boolean {
+  const pluginId = readPluginId(source.additionalMetadata);
+  if (pluginId === undefined) {
+    return false;
+  }
+
+  return factory.getPlugin?.(pluginId)?.metadata?.errorSource?.sourceType === source.sourceType;
 }
 
 export function getProviderForSource<
@@ -63,9 +107,14 @@ export function getProviderForSource<
     throw new Error("PostHog provider does not support custom API bases");
   }
 
+  const normalizedPostHogBaseUrl = posthogBaseUrl.trim();
+  if (hasMatchingErrorSourcePlugin(factory, source)) {
+    return provider.withApiBase(normalizedPostHogBaseUrl);
+  }
+
   // Let allowlist errors propagate before a plugin can receive a request URL.
   return provider.withApiBase(
-    assertAllowedPostHogBaseUrl(posthogBaseUrl.trim(), {
+    assertAllowedPostHogBaseUrl(normalizedPostHogBaseUrl, {
       extraAllowedHosts: parsePostHogAllowedHostsEnv(
         process.env.POSTHOG_ALLOWED_BASE_URLS,
       ),

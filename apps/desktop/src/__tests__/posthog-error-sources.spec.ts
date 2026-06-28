@@ -254,6 +254,13 @@ describe('posthog error source support', () => {
         configuration: { posthogBaseUrl: 'https://eu.posthog.com' },
       }),
     ).toMatchObject({ sourceType: 'posthog' })
+    expect(
+      getProviderForSource(factory, {
+        sourceType: 'posthog',
+        additionalMetadata: { pluginId: 'posthog' },
+        configuration: { posthogBaseUrl: 'https://metadata.google.internal' },
+      }),
+    ).toMatchObject({ sourceType: 'posthog' })
     expect(() =>
       getProviderForSource(factory, {
         sourceType: 'posthog',
@@ -435,6 +442,67 @@ describe('posthog error source support', () => {
     expect(JSON.parse(String(upsertInput.create.value))).toMatchObject({
       sourceType: 'github',
       pluginId: 'github',
+    })
+  })
+
+  it('starts OAuth for built-in-named code plugins without PostHog base URL allowlist', async () => {
+    const upsertSetting = vi.fn<DbClient['setting']['upsert']>().mockResolvedValue({})
+    const db = {
+      setting: {
+        findMany: vi.fn().mockResolvedValue([]),
+        upsert: upsertSetting,
+        findUnique: vi.fn().mockResolvedValue(null),
+        delete: vi.fn().mockResolvedValue({}),
+      },
+    }
+    const provider = {
+      buildAuthorizeUrl: vi.fn(() => 'https://posthog.example/oauth?state=state-1'),
+      exchangeCodeForToken: vi.fn(),
+      withApiBase: vi.fn(),
+    }
+    provider.withApiBase.mockReturnValue(provider)
+    const providerFactory: DesktopOauthManagerProviderFactory = {
+      getProvider: vi.fn(() => provider),
+      getProviderForSource: vi.fn(() => provider),
+      getPlugin: vi.fn((pluginId: string) => {
+        if (pluginId !== 'posthog') return null
+
+        return {
+          metadata: {
+            errorSource: {
+              sourceType: 'posthog',
+            },
+          },
+        }
+      }),
+    }
+    const manager = new OauthManagerService(
+      db,
+      providerFactory,
+    )
+
+    const initiated = await manager.initiateOAuth('posthog', {
+      pluginId: 'posthog',
+      clientId: 'client-id',
+      baseUrl: 'https://metadata.google.internal',
+    })
+
+    expect(initiated.authUrl).toBe('https://posthog.example/oauth?state=state-1')
+    expect(providerFactory.getProviderForSource).toHaveBeenCalledWith({
+      sourceType: 'posthog',
+      additionalMetadata: { pluginId: 'posthog' },
+      configuration: {
+        posthogBaseUrl: 'https://metadata.google.internal',
+      },
+    })
+    expect(provider.withApiBase).toHaveBeenCalledWith(
+      'https://metadata.google.internal',
+    )
+    const upsertInput = upsertSetting.mock.calls[0][0]
+    expect(JSON.parse(String(upsertInput.create.value))).toMatchObject({
+      sourceType: 'posthog',
+      pluginId: 'posthog',
+      providerBaseUrl: 'https://metadata.google.internal',
     })
   })
 

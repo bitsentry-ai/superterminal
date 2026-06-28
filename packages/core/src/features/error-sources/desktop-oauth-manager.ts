@@ -430,6 +430,25 @@ export class DesktopOauthManagerService {
     return plugin.metadata.errorSource.oauth;
   }
 
+  private hasMatchingErrorSourcePlugin(
+    sourceType: ErrorSourceType,
+    pluginId?: string,
+  ): boolean {
+    const normalizedPluginId = pluginId?.trim();
+    if (
+      normalizedPluginId === undefined ||
+      normalizedPluginId.length === 0 ||
+      this.options.resolvePluginDescriptor === undefined
+    ) {
+      return false;
+    }
+
+    return (
+      this.options.resolvePluginDescriptor(normalizedPluginId)?.metadata
+        ?.errorSource?.sourceType === sourceType
+    );
+  }
+
   private getProviderConfig(
     sourceType: ErrorSourceType,
     pluginId?: string,
@@ -483,10 +502,17 @@ export class DesktopOauthManagerService {
     );
 
     let providerBaseUrl: string | undefined;
+    const pluginOwnsSourceType = this.hasMatchingErrorSourcePlugin(
+      sourceType,
+      pluginId,
+    );
     if (sourceType === "posthog") {
-      providerBaseUrl = validatePostHogOAuthBaseUrl(
-        readPostHogBaseUrl(input ?? {}),
-      );
+      const requestedBaseUrl = readPostHogBaseUrl(input ?? {});
+      if (pluginOwnsSourceType) {
+        providerBaseUrl = requestedBaseUrl;
+      } else {
+        providerBaseUrl = validatePostHogOAuthBaseUrl(requestedBaseUrl);
+      }
     }
     const provider = this.getProviderForOAuth(
       sourceType,
@@ -565,12 +591,20 @@ export class DesktopOauthManagerService {
 
       const effectivePluginId = pending.pluginId ?? requestedPluginId;
       const config = this.getProviderConfig(sourceType, effectivePluginId);
+      const pluginOwnsSourceType = this.hasMatchingErrorSourcePlugin(
+        sourceType,
+        effectivePluginId,
+      );
       let pendingBaseUrl: string | undefined;
       if (
         pending.sourceType === "posthog" &&
         pending.providerBaseUrl !== undefined
       ) {
-        pendingBaseUrl = validatePostHogOAuthBaseUrl(pending.providerBaseUrl);
+        if (pluginOwnsSourceType) {
+          pendingBaseUrl = pending.providerBaseUrl;
+        } else {
+          pendingBaseUrl = validatePostHogOAuthBaseUrl(pending.providerBaseUrl);
+        }
       }
       let requestedBaseUrl: string | undefined;
       if (sourceType === "posthog") {
@@ -581,8 +615,12 @@ export class DesktopOauthManagerService {
       }
       let validatedRequestedBaseUrl: string | undefined;
       if (sourceType === "posthog" && requestedBaseUrl !== undefined) {
-        validatedRequestedBaseUrl =
-          validatePostHogOAuthBaseUrl(requestedBaseUrl);
+        if (pluginOwnsSourceType) {
+          validatedRequestedBaseUrl = requestedBaseUrl;
+        } else {
+          validatedRequestedBaseUrl =
+            validatePostHogOAuthBaseUrl(requestedBaseUrl);
+        }
       }
       if (
         pendingBaseUrl !== undefined &&
