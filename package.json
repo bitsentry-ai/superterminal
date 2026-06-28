@@ -16,6 +16,8 @@
     "build": "pnpm run build:packages && pnpm run desktop:build",
     "lint": "pnpm --filter @bitsentry-ce/desktop lint && pnpm --filter @bitsentry-ce/core lint && pnpm --filter @bitsentry-ce/components lint && pnpm --filter @bitsentry-ce/coding-agents lint && pnpm --filter @bitsentry-ce/desktop-cli lint && pnpm --filter @bitsentry-ce/i18n lint && pnpm --dir packages/electron-trpc run lint",
     "lint:fix": "pnpm --filter @bitsentry-ce/desktop lint:fix && pnpm --filter @bitsentry-ce/core lint:fix && pnpm --filter @bitsentry-ce/components lint:fix && pnpm --filter @bitsentry-ce/coding-agents lint:fix && pnpm --filter @bitsentry-ce/desktop-cli lint:fix && pnpm --filter @bitsentry-ce/i18n lint:fix && pnpm --dir packages/electron-trpc run lint:fix",
+    "format": "pnpm --dir packages/electron-trpc run lint:fix",
+    "format:check": "pnpm --dir packages/electron-trpc run lint",
     "build:packages": "pnpm --filter @bitsentry-ce/core build && pnpm --filter @bitsentry-ce/i18n build && pnpm --filter @bitsentry-ce/components build && pnpm --filter @bitsentry-ce/coding-agents build && pnpm --filter @bitsentry-ce/desktop-cli build",
     "core:build": "pnpm --filter @bitsentry-ce/core build",
     "i18n:build": "pnpm --filter @bitsentry-ce/i18n build",
