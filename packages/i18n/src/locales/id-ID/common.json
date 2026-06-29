@@ -1080,6 +1080,7 @@
   "common.systemSettings.sessionTimeout": "Batas waktu sesi",
   "common.systemSettings.setPasswordComplexityAndExpiration": "Atur aturan kompleksitas dan kedaluwarsa kata sandi untuk semua akun pengguna.",
   "common.systemSettings.workosManagedPasswordExpirationNotice": "WorkOS mengelola kompleksitas kata sandi dan MFA. BitSentry tetap menerapkan masa kedaluwarsa kata sandi di bawah ini untuk pengguna dashboard yang terhubung.",
+  "common.systemSettings.workosManagedAuthPoliciesNotice": "Autentikasi BitSentry Cloud, MFA, sesi, passkey, pemulihan akun, dan kebijakan akses dikelola di WorkOS untuk lingkungan ini.",
   "common.systemSettings.specialCharacters": "Karakter khusus",
   "common.systemSettings.systemIsUnderMaintenancePlease": "Sistem sedang dalam pemeliharaan. Silakan coba lagi nanti.",
   "common.systemSettings.timeFormat": "Format waktu",

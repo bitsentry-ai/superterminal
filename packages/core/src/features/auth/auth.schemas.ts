@@ -13,8 +13,6 @@ export const statusSchema = z.object({
 export const userSchema = z.object({
   id: z.union([z.number(), z.string()]),
   email: z.email().nullable(),
-  provider: z.string(),
-  socialId: z.string().nullable().optional(),
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
   role: roleSchema.nullable().optional(),
@@ -54,9 +52,6 @@ export const resetPasswordSchema = z.object({
 export const updateProfileSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
-  email: z.email().optional(),
-  password: z.string().min(6).optional(),
-  oldPassword: z.string().min(1).optional(),
 });
 
 export const verifyEmailSchema = z.object({
@@ -76,7 +71,6 @@ export const loginResponseSchema = z.object({
   refreshToken: z.string(),
   tokenExpires: z.number(),
   user: userSchema,
-  rememberMeExpiryHours: z.number().optional(),
 });
 
 export const refreshResponseSchema = z.object({

@@ -1080,6 +1080,7 @@
   "common.systemSettings.sessionTimeout": "Session timeout",
   "common.systemSettings.setPasswordComplexityAndExpiration": "Set password complexity and expiration rules for all user accounts.",
   "common.systemSettings.workosManagedPasswordExpirationNotice": "WorkOS manages password complexity and MFA. BitSentry still enforces the password expiration period below for linked dashboard users.",
+  "common.systemSettings.workosManagedAuthPoliciesNotice": "BitSentry Cloud authentication, MFA, sessions, passkeys, account recovery, and access policies are managed in WorkOS for this environment.",
   "common.systemSettings.specialCharacters": "Special characters",
   "common.systemSettings.systemIsUnderMaintenancePlease": "System is under maintenance. Please check back later.",
   "common.systemSettings.timeFormat": "Time format",

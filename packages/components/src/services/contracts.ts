@@ -386,7 +386,6 @@ export interface TotpFor2FAVerifyResponse {
   verified?: boolean;
   token?: string;
   refreshToken?: string;
-  rememberMeExpiryHours?: number;
   user?: CurrentUser;
   message?: string;
 }

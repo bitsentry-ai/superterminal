@@ -1080,6 +1080,7 @@
   "common.systemSettings.sessionTimeout": "会话超时",
   "common.systemSettings.setPasswordComplexityAndExpiration": "为所有用户账户设置密码复杂度和过期规则。",
   "common.systemSettings.workosManagedPasswordExpirationNotice": "WorkOS 负责密码复杂度和多因素认证。BitSentry 仍会对已关联的仪表板用户强制执行下方的密码过期周期。",
+  "common.systemSettings.workosManagedAuthPoliciesNotice": "此环境中的 BitSentry Cloud 身份验证、多因素认证、会话、通行密钥、账户恢复和访问策略均由 WorkOS 管理。",
   "common.systemSettings.specialCharacters": "特殊字符",
   "common.systemSettings.systemIsUnderMaintenancePlease": "系统正在维护中，请稍后再试。",
   "common.systemSettings.timeFormat": "时间格式",

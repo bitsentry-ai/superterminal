@@ -100,7 +100,6 @@ export interface LoginResponse {
   refreshToken: string;
   tokenExpires: number;
   user: CurrentUser;
-  rememberMeExpiryHours?: number;
 }
 
 export interface RefreshResponse {
@@ -147,7 +146,6 @@ export interface MagicLinkVerifyResponse {
   refreshToken: string;
   tokenExpires: number;
   user: User;
-  rememberMeExpiryHours?: number;
 }
 
 // Email OTP types

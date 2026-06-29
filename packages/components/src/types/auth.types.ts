@@ -17,7 +17,6 @@ export interface PasswordLoginResult {
 export interface TwoFactorAuthResult {
   token: string;
   refreshToken?: string;
-  rememberMeExpiryHours?: number;
   user: User;
   totpVerified?: boolean;
   emailOtpVerified?: boolean;
