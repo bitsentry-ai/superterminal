@@ -13,37 +13,12 @@ type RefreshOAuthProviderConfig = Pick<
   "envClientIdName" | "envClientSecretName" | "publicClient"
 >;
 
-type BuiltInRefreshOAuthSourceType = "sentry" | "posthog";
-type DesktopOAuthProviderConfigMap = Record<
-  BuiltInRefreshOAuthSourceType,
-  RefreshOAuthProviderConfig
-> &
-  Partial<
-    Record<
-      ErrorSourceType,
-      RefreshOAuthProviderConfig
-    >
-  >;
-
 type PluginOAuthProviderConfigOverride = Partial<
   Pick<
     OAuthProviderConfig,
     "envClientIdName" | "envClientSecretName" | "publicClient"
   >
 >;
-
-const DESKTOP_OAUTH_PROVIDER_CONFIGS: DesktopOAuthProviderConfigMap = {
-  sentry: {
-    envClientIdName: "SENTRY_OAUTH_CLIENT_ID",
-    envClientSecretName: "SENTRY_OAUTH_CLIENT_SECRET",
-    publicClient: false,
-  },
-  posthog: {
-    envClientIdName: "POSTHOG_OAUTH_CLIENT_ID",
-    envClientSecretName: "POSTHOG_OAUTH_CLIENT_SECRET",
-    publicClient: true,
-  },
-};
 
 type DesktopPluginMetadataLike = {
   metadata?: {
@@ -69,12 +44,6 @@ function getRequiredEnv(name: string): string {
     throw new Error(`${name} is required`);
   }
   return value;
-}
-
-function getProviderConfig(
-  sourceType: ErrorSourceType,
-): RefreshOAuthProviderConfig | undefined {
-  return DESKTOP_OAUTH_PROVIDER_CONFIGS[sourceType];
 }
 
 function readMissingProviderConfigKeys(
@@ -103,18 +72,16 @@ function readMissingProviderConfigKeys(
 
 function mergeProviderConfig(input: {
   sourceType: ErrorSourceType;
-  baseConfig?: RefreshOAuthProviderConfig;
   pluginOverride?: PluginOAuthProviderConfigOverride;
 }): RefreshOAuthProviderConfig {
-  if (input.baseConfig === undefined && input.pluginOverride === undefined) {
+  if (input.pluginOverride === undefined) {
     throw new Error(
       `OAuth refresh is not configured for source type: ${input.sourceType}`,
     );
   }
 
   const merged: Partial<RefreshOAuthProviderConfig> = {
-    ...(input.baseConfig ?? {}),
-    ...(input.pluginOverride ?? {}),
+    ...input.pluginOverride,
   };
   const missingKeys = readMissingProviderConfigKeys(merged);
   if (missingKeys.length > 0) {
@@ -373,21 +340,19 @@ async function performTokenRefresh<
   refreshToken: string,
 ): Promise<string> {
   const { source, sourcesRepository, providerFactory, signal } = input;
-  const provider = getProviderForSource(providerFactory, {
-    sourceType: source.sourceType,
-    additionalMetadata: source.additionalMetadata,
-    configuration: source.configuration,
-  });
   const config = source.configuration ?? {};
-  const providerConfig = getProviderConfig(source.sourceType);
   const pluginConfigOverride = getPluginProviderConfigOverride(
     source,
     providerFactory,
   );
   const effectiveProviderConfig = mergeProviderConfig({
     sourceType: source.sourceType,
-    baseConfig: providerConfig,
     pluginOverride: pluginConfigOverride,
+  });
+  const provider = getProviderForSource(providerFactory, {
+    sourceType: source.sourceType,
+    additionalMetadata: source.additionalMetadata,
+    configuration: source.configuration,
   });
   const oauthClientId =
     readOptionalString(config.oauthClientId) ??

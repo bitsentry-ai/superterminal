@@ -125,4 +125,50 @@ describe('refreshSourceAccessToken', () => {
       }),
     )
   })
+
+  it('does not fall back to built-in OAuth refresh config', async () => {
+    const provider = {
+      refreshToken: vi.fn(),
+    }
+    const providerFactory = {
+      getProvider: vi.fn(() => provider),
+      getProviderForSource: vi.fn(() => provider),
+      getPlugin: vi.fn(() => ({
+        metadata: {
+          errorSource: {
+            sourceType: 'posthog',
+          },
+        },
+      })),
+    }
+
+    await expect(
+      refreshSourceAccessToken({
+        source: {
+          id: 'source-3',
+          name: 'Production PostHog',
+          sourceType: 'posthog' as const,
+          accessTokenRef: 'stale-access-token',
+          refreshTokenRef: 'stored-refresh-token',
+          expiresAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+          grantedScopes: ['project:read'],
+          configuration: {
+            oauthClientId: 'client-id',
+          },
+          additionalMetadata: {
+            pluginId: 'posthog',
+          },
+        },
+        sourcesRepository: {
+          update: vi.fn(),
+        },
+        providerFactory,
+      } satisfies RefreshAccessTokenInput),
+    ).rejects.toThrow(
+      'OAuth refresh is not configured for source type: posthog',
+    )
+
+    expect(providerFactory.getProviderForSource).not.toHaveBeenCalled()
+    expect(provider.refreshToken).not.toHaveBeenCalled()
+  })
 })
