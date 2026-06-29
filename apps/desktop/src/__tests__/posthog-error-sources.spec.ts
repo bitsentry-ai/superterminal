@@ -219,10 +219,8 @@ describe('posthog error source support', () => {
         pluginId: 'posthog',
         sourceType: 'posthog',
         name: 'Production PostHog',
-        authToken: 'phx-token',
-        projectIds: ['123', '456'],
-        baseUrl: 'https://eu.posthog.com',
         setupValues: {
+          authToken: 'phx-token',
           baseUrl: 'https://eu.posthog.com',
           projectIds: ['123', '456'],
         },
@@ -230,8 +228,11 @@ describe('posthog error source support', () => {
     ).toMatchObject({
       pluginId: 'posthog',
       sourceType: 'posthog',
-      projectIds: ['123', '456'],
-      baseUrl: 'https://eu.posthog.com',
+      setupValues: {
+        authToken: 'phx-token',
+        baseUrl: 'https://eu.posthog.com',
+        projectIds: ['123', '456'],
+      },
     })
   })
 

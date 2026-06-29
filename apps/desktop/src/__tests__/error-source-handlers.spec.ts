@@ -76,6 +76,30 @@ function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
             required: true,
             control: 'password',
           },
+          {
+            key: 'baseUrl',
+            storage: 'configuration',
+            configurationKey: 'baseUrl',
+            label: 'PostHog base URL',
+            required: false,
+            control: 'text',
+          },
+          {
+            key: 'organizationId',
+            storage: 'configuration',
+            configurationKey: 'orgSlug',
+            label: 'Organization ID',
+            required: false,
+            control: 'text',
+          },
+          {
+            key: 'projectIds',
+            storage: 'configuration',
+            configurationKey: 'projectIds',
+            label: 'Project IDs',
+            required: false,
+            control: 'multiline_list',
+          },
         ],
       },
     },
@@ -359,10 +383,10 @@ describe('desktop error source handlers', () => {
         name: 'Production PostHog',
         setupValues: {
           accessToken: 'phx-token',
+          organizationId: 'org-1',
+          projectIds: ['177710'],
+          baseUrl: 'https://eu.posthog.com',
         },
-        organizationId: 'org-1',
-        projectIds: ['177710'],
-        baseUrl: 'https://eu.posthog.com',
         syncEnabled: false,
         autoDiagnosisEnabled: true,
       }),
@@ -440,8 +464,10 @@ describe('desktop error source handlers', () => {
     await expect(
       handlers['errorSources:update']?.({
         id: 'source-1',
-        projectIds: ['999'],
-        baseUrl: 'https://metadata.google.internal',
+        setupValues: {
+          projectIds: ['999'],
+          baseUrl: 'https://metadata.google.internal',
+        },
       }),
     ).resolves.toMatchObject({
       pluginId: 'posthog',
@@ -476,7 +502,9 @@ describe('desktop error source handlers', () => {
     await expect(
       handlers['errorSources:update']?.({
         id: 'source-1',
-        projectIds: ['999'],
+        setupValues: {
+          projectIds: ['999'],
+        },
       }),
     ).rejects.toThrow(
       'Error source plugin "posthog" does not match source type posthog',

@@ -35,15 +35,6 @@ const createErrorSourcePayloadSchema = z
     sourceType: errorSourceTypeSchema,
     name: z.string().min(1),
     setupValues: handlerPayloadSchema.optional(),
-    authToken: z.string().optional(),
-    organizationSlug: z.string().optional(),
-    organizationId: z.string().optional(),
-    projectSlugs: z.array(z.string()).optional(),
-    projectIds: z.array(z.string()).optional(),
-    indexPatterns: z.array(z.string()).optional(),
-    sentryBaseUrl: z.string().optional(),
-    baseUrl: z.string().optional(),
-    posthogBaseUrl: z.string().optional(),
     configuration: handlerPayloadSchema.optional(),
     additionalMetadata: handlerPayloadSchema.optional(),
     logLevelThreshold: z.enum(['error', 'warning', 'info', 'debug']).optional(),
@@ -59,14 +50,6 @@ const updateErrorSourcePayloadSchema = z
     setupValues: handlerPayloadSchema.optional(),
     configuration: handlerPayloadSchema.optional(),
     additionalMetadata: handlerPayloadSchema.optional(),
-    organizationSlug: z.string().optional(),
-    organizationId: z.string().optional(),
-    projectSlugs: z.array(z.string()).optional(),
-    projectIds: z.array(z.string()).optional(),
-    indexPatterns: z.array(z.string()).optional(),
-    sentryBaseUrl: z.string().optional(),
-    baseUrl: z.string().optional(),
-    posthogBaseUrl: z.string().optional(),
     logLevelThreshold: z.enum(['error', 'warning', 'info', 'debug']).optional(),
     syncEnabled: z.boolean().optional(),
     autoDiagnosisEnabled: z.boolean().optional(),
@@ -328,20 +311,6 @@ function readPluginId(value: unknown): string | undefined {
   }
 
   return normalized
-}
-
-function readSetupTrimmed(
-  setupValues: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  return readOptionalTrimmed(setupValues[key])
-}
-
-function readSetupStringArray(
-  setupValues: Record<string, unknown>,
-  key: string,
-): string[] {
-  return readStringArray(setupValues[key])
 }
 
 type PersistedPluginSetup = {
@@ -951,11 +920,6 @@ export function createDesktopErrorSourcesHandlers(
         pluginId,
         sourceType,
       )
-      const authToken =
-	        readSetupTrimmed(setupValues, 'authToken') ??
-	        payload.authToken?.trim() ??
-	        persistedSetup.accessTokenRef ??
-	        ''
       const sourceName = payload.name
 
       if (!usePluginCreatePath) {
@@ -965,44 +929,9 @@ export function createDesktopErrorSourcesHandlers(
       }
 
       try {
-        let customPluginAuthToken = authToken
-        if (customPluginAuthToken.length === 0) {
-          customPluginAuthToken = persistedSetup.accessTokenRef ?? ''
-        }
         const customPluginConfiguration = {
           ...persistedSetup.configuration,
           ...(readPayloadRecord(payload.configuration) ?? {}),
-        }
-        const legacyBaseUrl = readOptionalTrimmed(payload.baseUrl)
-        if (legacyBaseUrl !== undefined) {
-          customPluginConfiguration.baseUrl = legacyBaseUrl
-        }
-        const sentryBaseUrl = readOptionalTrimmed(payload.sentryBaseUrl)
-        if (sentryBaseUrl !== undefined) {
-          customPluginConfiguration.sentryBaseUrl = sentryBaseUrl
-        }
-        const posthogBaseUrl = readOptionalTrimmed(payload.posthogBaseUrl)
-        if (posthogBaseUrl !== undefined) {
-          customPluginConfiguration.posthogBaseUrl = posthogBaseUrl
-        }
-        const organizationSlug = readOptionalTrimmed(
-          payload.organizationSlug ?? payload.organizationId,
-        )
-        if (organizationSlug !== undefined) {
-          customPluginConfiguration.orgSlug = organizationSlug
-        }
-        const projectSlugs = readStringArray(payload.projectSlugs)
-        if (projectSlugs.length > 0) {
-          customPluginConfiguration.projectSlugs = projectSlugs
-        }
-        const projectIds = readStringArray(payload.projectIds)
-        if (projectIds.length > 0) {
-          customPluginConfiguration.projectIds = projectIds
-        }
-        if (Array.isArray(payload.indexPatterns)) {
-          customPluginConfiguration.indexPatterns = readStringArray(
-            payload.indexPatterns,
-          )
         }
 
         const created = await sourcesRepository.create({
@@ -1012,7 +941,9 @@ export function createDesktopErrorSourcesHandlers(
             readPayloadRecord(payload.additionalMetadata),
             pluginId,
           ),
-          accessTokenRef: nullableNonEmptyString(customPluginAuthToken),
+          accessTokenRef: nullableNonEmptyString(
+            persistedSetup.accessTokenRef ?? '',
+          ),
           refreshTokenRef: null,
           expiresAt: null,
           grantedScopes: [],
@@ -1056,53 +987,6 @@ export function createDesktopErrorSourcesHandlers(
           ...nextConfiguration,
           ...persistedSetup.configuration,
         }
-      }
-
-      if (typeof payload.organizationSlug === 'string' && payload.organizationSlug.trim().length > 0) {
-        nextConfiguration.orgSlug = payload.organizationSlug.trim()
-      }
-      if (typeof payload.organizationId === 'string' && payload.organizationId.trim().length > 0) {
-        nextConfiguration.orgSlug = payload.organizationId.trim()
-      }
-      const setupOrganizationSlug =
-        readSetupTrimmed(setupValues, 'organizationSlug') ??
-        readSetupTrimmed(setupValues, 'organizationId')
-      if (setupOrganizationSlug !== undefined) {
-        nextConfiguration.orgSlug = setupOrganizationSlug
-      }
-
-      if (Array.isArray(payload.projectSlugs)) {
-        nextConfiguration.projectSlugs = readStringArray(payload.projectSlugs)
-      }
-      const setupProjectSlugs = readSetupStringArray(setupValues, 'projectSlugs')
-      if (setupProjectSlugs.length > 0) {
-        nextConfiguration.projectSlugs = setupProjectSlugs
-      }
-      if (Array.isArray(payload.projectIds)) {
-        const nextProjectIds = readStringArray(payload.projectIds)
-        // Treat an explicitly empty `projectIds` as "no change" rather than
-        // collapsing the persisted list to zero projects. The create flow
-        // interprets empty as "all projects" via auto-resolution; persisting
-        // an empty array on update would silently disable sync without any
-        // user-visible signal.
-        if (nextProjectIds.length > 0) {
-          nextConfiguration.projectIds = nextProjectIds
-        }
-      }
-      const setupProjectIds = readSetupStringArray(setupValues, 'projectIds')
-      if (setupProjectIds.length > 0) {
-        nextConfiguration.projectIds = setupProjectIds
-      }
-      if (Array.isArray(payload.indexPatterns)) {
-        nextConfiguration.indexPatterns = readStringArray(payload.indexPatterns)
-      }
-      const nextBaseUrl = readOptionalTrimmed(payload.baseUrl)
-      if (nextBaseUrl !== undefined) {
-        nextConfiguration.baseUrl = nextBaseUrl
-      }
-      const payloadPostHogBaseUrl = readOptionalTrimmed(payload.posthogBaseUrl)
-      if (payloadPostHogBaseUrl !== undefined) {
-        nextConfiguration.posthogBaseUrl = payloadPostHogBaseUrl
       }
 
       const updated = await sourcesRepository.update({

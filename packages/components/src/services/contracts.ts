@@ -524,13 +524,6 @@ export interface CreateErrorSourceInput {
   sourceType: ErrorSourceType;
   name: string;
   setupValues?: Record<string, unknown>;
-  authToken?: string;
-  organizationSlug?: string;
-  organizationId?: string;
-  projectSlugs?: string[];
-  projectIds?: string[];
-  baseUrl?: string;
-  indexPatterns?: string[];
   logLevelThreshold: LogLevelThreshold;
   syncEnabled: boolean;
   autoDiagnosisEnabled: boolean;
