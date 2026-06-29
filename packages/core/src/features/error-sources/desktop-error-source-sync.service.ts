@@ -332,6 +332,7 @@ function buildPluginAuthFromSource(
     if (field.storage === 'accessTokenRef') {
       if (accessToken !== undefined && accessToken.length > 0) {
         auth[field.key] = accessToken
+        auth.accessToken = accessToken
       }
       continue
     }

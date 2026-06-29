@@ -309,9 +309,11 @@ describe('desktop error source handlers', () => {
       handlers['errorSources:probeConnection']?.({
         pluginId: 'posthog',
         sourceType: 'posthog',
-        authToken: 'phx-token',
-        organizationId: 'org-1',
-        baseUrl: 'https://metadata.google.internal',
+        setupValues: {
+          accessToken: 'phx-token',
+          organizationId: 'org-1',
+          baseUrl: 'https://metadata.google.internal',
+        },
       }),
     ).resolves.toEqual({
       organizations: [{ id: 'org-1', name: 'Production' }],
@@ -329,13 +331,16 @@ describe('desktop error source handlers', () => {
       expect.objectContaining({
         pluginId: 'posthog',
         actionId: 'list_organizations',
-        auth: {
-          accessToken: 'phx-token',
-          baseUrl: 'https://metadata.google.internal',
-        },
         input: {},
       }),
     )
+    const firstProbeRequest = runtime.executeActionMock.mock.calls[0]?.[0]
+    expect(firstProbeRequest?.auth).toMatchObject({
+      accessToken: 'phx-token',
+      baseUrl: 'https://metadata.google.internal',
+      orgSlug: 'org-1',
+      organizationId: 'org-1',
+    })
     expect(runtime.executeActionMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
@@ -358,7 +363,9 @@ describe('desktop error source handlers', () => {
       handlers['errorSources:probeConnection']?.({
         pluginId: 'posthog',
         sourceType: 'posthog',
-        authToken: 'phx-token',
+        setupValues: {
+          accessToken: 'phx-token',
+        },
       }),
     ).rejects.toThrow(
       'Error source plugin "posthog" does not match source type posthog',

@@ -24,12 +24,16 @@ describe('desktop IPC payload validation', () => {
       validate('errorSources:probeConnection', {
         pluginId: 'github',
         sourceType: 'github',
-        authToken: 'github-token',
+        setupValues: {
+          accessToken: 'github-token',
+        },
       }),
     ).toMatchObject({
       pluginId: 'github',
       sourceType: 'github',
-      authToken: 'github-token',
+      setupValues: {
+        accessToken: 'github-token',
+      },
     })
   })
 })

@@ -56,6 +56,12 @@ const updateErrorSourcePayloadSchema = z
   })
   .loose()
 type UpdateErrorSourcePayload = z.infer<typeof updateErrorSourcePayloadSchema>
+const probeConnectionPayloadSchema = z.object({
+  pluginId: z.string().optional(),
+  sourceType: errorSourceTypeSchema,
+  setupValues: handlerPayloadSchema.optional(),
+})
+type ProbeConnectionPayload = z.infer<typeof probeConnectionPayloadSchema>
 const initiateOAuthPayloadSchema = z
   .object({
     pluginId: z.string().optional(),
@@ -115,14 +121,6 @@ type DesktopOauthManagerServiceClass = new (
 let syncScheduler: SyncSchedulerService | null = null
 let interruptedSyncRecovery: Promise<void> | null = null
 
-function readHandlerPayload(payload: unknown): Record<string, unknown> {
-  if (payload === null || payload === undefined) {
-    return {}
-  }
-
-  return handlerPayloadSchema.parse(payload)
-}
-
 function readPayloadRecord(value: unknown): Record<string, unknown> | null {
   const parsed = handlerPayloadSchema.safeParse(value)
   if (parsed.success) {
@@ -138,6 +136,10 @@ function readCreateErrorSourcePayload(payload: unknown): CreateErrorSourcePayloa
 
 function readUpdateErrorSourcePayload(payload: unknown): UpdateErrorSourcePayload {
   return updateErrorSourcePayloadSchema.parse(payload)
+}
+
+function readProbeConnectionPayload(payload: unknown): ProbeConnectionPayload {
+  return probeConnectionPayloadSchema.parse(payload)
 }
 
 function readInitiateOAuthPayload(payload: unknown): InitiateOAuthPayload {
@@ -241,15 +243,6 @@ function readOptionalTrimmed(value: unknown): string | undefined {
   const normalized = value.trim()
   if (normalized.length === 0) {
     return undefined
-  }
-
-  return normalized
-}
-
-function readRequiredTrimmed(value: unknown, label: string): string {
-  const normalized = readOptionalTrimmed(value)
-  if (normalized === undefined) {
-    throw new Error(`${label} is required`)
   }
 
   return normalized
@@ -542,6 +535,7 @@ function buildPluginAuthFromSource(
     if (field.storage === 'accessTokenRef') {
       if (accessToken.length > 0) {
         auth[field.key] = accessToken
+        auth.accessToken = accessToken
       }
       continue
     }
@@ -564,24 +558,33 @@ function buildPluginAuthFromSource(
 function buildPluginProbeAuth(input: {
   pluginRuntime: DesktopPluginRuntimeService
   pluginId: string
-  authToken: string
-  baseUrl?: string
+  persistedSetup: PersistedPluginSetup
 }): Record<string, unknown> {
-  const auth: Record<string, unknown> = {
-    accessToken: input.authToken,
-  }
+  const auth: Record<string, unknown> = {}
+  const accessToken = input.persistedSetup.accessTokenRef?.trim()
 
   for (const field of readPluginErrorSourceSetupFields(
     input.pluginRuntime,
     input.pluginId,
   )) {
     if (field.storage === 'accessTokenRef') {
-      auth[field.key] = input.authToken
+      if (accessToken !== undefined && accessToken.length > 0) {
+        auth[field.key] = accessToken
+        auth.accessToken = accessToken
+      }
+      continue
     }
-  }
 
-  if (input.baseUrl !== undefined) {
-    auth.baseUrl = input.baseUrl
+    const configurationKey = field.configurationKey ?? field.key
+    const value = input.persistedSetup.configuration[configurationKey]
+    if (value === undefined) {
+      continue
+    }
+
+    auth[field.key] = value
+    if (configurationKey !== field.key) {
+      auth[configurationKey] = value
+    }
   }
 
   return auth
@@ -758,19 +761,18 @@ export function createDesktopErrorSourcesHandlers(
   return {
 
     'errorSources:probeConnection': async (rawPayload: unknown) => {
-      const payload = readHandlerPayload(rawPayload)
-      const sourceType = readSourceType(payload.sourceType)
-      if (sourceType === null) {
-        throw new Error('Probe requires a sourceType')
-      }
-
-      const authToken = readRequiredTrimmed(payload.authToken, 'authToken')
-
-      const requestedOrgSlug = readOptionalTrimmed(
-        payload.organizationSlug ?? payload.organizationId,
-      )
+      const payload = readProbeConnectionPayload(rawPayload)
+      const sourceType = payload.sourceType
       const pluginId = readPluginId(payload.pluginId) ?? sourceType
-      const baseUrl = readOptionalTrimmed(payload.baseUrl)
+      const setupValues = readPayloadRecord(payload.setupValues) ?? {}
+      const persistedSetup = resolvePersistedPluginSetup(
+        pluginRuntime,
+        pluginId,
+        setupValues,
+      )
+      const requestedOrgSlug = readOptionalTrimmed(
+        persistedSetup.configuration.orgSlug,
+      )
       const plugin = pluginRuntime.getPlugin(pluginId)
 
       log.info(
@@ -792,8 +794,7 @@ export function createDesktopErrorSourcesHandlers(
         const auth = buildPluginProbeAuth({
           pluginRuntime,
           pluginId,
-          authToken,
-          baseUrl,
+          persistedSetup,
         })
         const orgResult = await pluginRuntime.executeAction({
           pluginId,

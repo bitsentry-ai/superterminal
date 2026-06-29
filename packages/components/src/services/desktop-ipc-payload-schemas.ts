@@ -329,10 +329,7 @@ export function createDesktopIpcPayloadValidator(
     "errorSources:probeConnection": z.object({
       pluginId: z.string().min(1).optional(),
       sourceType: z.string().min(1),
-      authToken: z.string().min(1),
-      baseUrl: z.url().optional(),
-      organizationSlug: z.string().min(1).optional(),
-      organizationId: z.string().min(1).optional(),
+      setupValues: z.record(z.string(), z.unknown()).optional(),
     }),
     "errorSources:triggerSync": z
       .object({

@@ -90,17 +90,7 @@ export const testErrorSourceConnectionResultSchema = z.object({
 export const probeErrorSourceSchema = z.object({
   pluginId: z.string().trim().min(1).optional(),
   sourceType: errorSourceTypeSchema,
-  authToken: z.string().trim().min(1),
-  baseUrl: z.url().optional(),
-  /**
-   * Optional org disambiguation. The PostHog create/update flows use
-   * `organizationId` as the canonical field; we accept both names here so a
-   * backend/dashboard caller can pass the same value through every step of
-   * the flow without juggling field names. The service normalizes whichever
-   * one is provided into a single slug before fanning out.
-   */
-  organizationSlug: z.string().trim().min(1).optional(),
-  organizationId: z.string().trim().min(1).optional(),
+  setupValues: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const probeErrorSourceResultSchema = z.object({
