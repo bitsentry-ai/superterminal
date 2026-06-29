@@ -89,6 +89,12 @@ import { startAutoUpdater } from '@bitsentry-ce/desktop-cli/runtime/desktop-upda
 
 type UpdaterController = ReturnType<typeof startAutoUpdater> | null
 type LocalAiProviderService = InstanceType<typeof CodingAgentsProviderService>
+type DesktopIpcHandler = (options: {
+  router: ReturnType<typeof createDesktopTrpcRouter>
+  windows: BrowserWindow[]
+}) => void
+
+const createDesktopIPCHandler = createIPCHandler as DesktopIpcHandler
 
 let services: DesktopServices | null = null
 let agentRuntime: ReturnType<typeof createDesktopAgentService> | null = null
@@ -591,10 +597,11 @@ app
       })
 
       await createWindow()
-      if (desktopShell.mainWindow !== null) {
-        createIPCHandler({
+      const mainWindow = getBrowserWindow()
+      if (mainWindow !== null) {
+        createDesktopIPCHandler({
           router: createDesktopTrpcRouter(dispatcher),
-          windows: [getBrowserWindow()].filter((window): window is BrowserWindow => window !== null),
+          windows: [mainWindow],
         })
       }
 
