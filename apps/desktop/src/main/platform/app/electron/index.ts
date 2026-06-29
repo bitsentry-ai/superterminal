@@ -484,7 +484,7 @@ app
       // Renderer init gate: only true when both the user has opted in AND the
       // main process actually has a DSN configured. Without a DSN, main never
       // initializes the Sentry main client, so the renderer SDK can't reach it
-      // (manifests as "sentry-ipc://" CSP errors or "scheme not supported").
+      // (appears as "sentry-ipc://" CSP errors or "scheme not supported").
       ipcMain.handle('bitsentry:sentry:rendererShouldInit', async () => {
         if (!hasSentryDsn()) return false
         return isSentryEnabled(db)

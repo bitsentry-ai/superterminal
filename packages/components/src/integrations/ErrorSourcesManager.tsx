@@ -85,13 +85,10 @@ function formatStoredSyncErrorMessage(error: unknown, t: Translate): string {
     return t("common.errorSourcesManager.workerEndpointUnavailable");
   }
 
-  const match = /^(PostHog|Sentry) API (\d+):\s*(.*)$/i.exec(message);
+  const match = /^(.+?) API (\d+):\s*(.*)$/i.exec(message);
   if (match === null) return message;
 
-  let provider = t("common.errorSourcesManager.sentryProviderName");
-  if (match[1].toLowerCase() === "posthog") {
-    provider = t("common.errorSourcesManager.posthogProviderName");
-  }
+  const provider = match[1].trim();
   const prefix = t("common.errorSourcesManager.apiErrorDetail", {
     provider,
     status: match[2],
@@ -245,7 +242,7 @@ function setupFieldDescription(
 function editSetupFieldPlaceholder(
   field: PluginErrorSourceSetupField,
 ): string {
-  if (field.storage === "accessTokenRef") {
+  if (field.control === "password") {
     return "Leave blank to keep the current token.";
   }
 
@@ -273,13 +270,11 @@ function readPluginSetupFieldDisplayValue(
     return "";
   }
 
-  const key = field.configurationKey ?? field.key;
-
-  if (field.storage === "accessTokenRef") {
+  if (field.control === "password") {
     return "";
   }
 
-  const value = config[key];
+  const value = config[field.key];
   if (typeof value === "string") {
     return value;
   }
@@ -624,8 +619,8 @@ export default function ErrorSourcesManager({
     return input;
   }
 
-  // Submit the plugin-defined setup values without translating through a
-  // built-in provider field vocabulary.
+  // Submit plugin-defined setup values directly; plugin code owns persistence
+  // and auth mapping for its source type.
   const createSource = async () => {
     const trimmedName = sourceName.trim();
     const validationError = readCreateSourceValidationError(trimmedName);
@@ -716,7 +711,7 @@ export default function ErrorSourcesManager({
         continue;
       }
 
-      if (field.storage === "accessTokenRef") {
+      if (field.control === "password") {
         continue;
       }
 

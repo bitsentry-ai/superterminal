@@ -76,7 +76,7 @@ export default function TourSettingsPreview() {
               <div className="flex items-start justify-between gap-4">
                 <SectionHeader
                   title="External Sources"
-                  description="Connect Sentry, Wazuh, or PostHog for runbook queries."
+                  description="Connect code-plugin sources for runbook queries."
                 />
                 <button className="rounded-md border border-border px-3 py-1.5 text-xs font-medium">
                   Add Source
@@ -87,7 +87,9 @@ export default function TourSettingsPreview() {
                   <div className="flex items-center gap-3">
                     <DatabaseZap size={16} className="text-primary" />
                     <div>
-                      <div className="text-sm font-medium">Production Sentry</div>
+                      <div className="text-sm font-medium">
+                        Production GitHub Issues
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         Last sync succeeded - error threshold
                       </div>

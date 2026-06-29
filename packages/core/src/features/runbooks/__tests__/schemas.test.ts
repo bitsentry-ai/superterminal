@@ -178,12 +178,12 @@ assert(
           {
             id: "action-1",
             type: "external_source",
-            title: "Search recent errors",
-            query: "error",
+            title: "Search GitHub issues",
+            query: "is:issue is:open",
             sourceId: "source-1",
-            sourceRef: "lumendesk-posthog",
-            sourceName: "Lumendesk PostHog",
-            sourceType: "posthog",
+            sourceRef: "github-issues",
+            sourceName: "GitHub Issues",
+            sourceType: "github",
             logFilter: {
               pattern: "(?<issue_count>\\d+)",
             },
@@ -221,13 +221,12 @@ assert(
     ],
     externalSources: [
       {
-        ref: "lumendesk-posthog",
-        sourceType: "posthog",
-        name: "Lumendesk PostHog",
+        ref: "github-issues",
+        sourceType: "github",
+        name: "GitHub Issues",
         configuration: {
-          orgSlug: "lumendesk",
-          baseUrl: "https://us.posthog.com",
-          projectIds: ["123"],
+          owner: "bitsentry-ai",
+          repo: "monorepo",
         },
         credentials: {
           authToken: "",
