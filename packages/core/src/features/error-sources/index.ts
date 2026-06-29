@@ -4,7 +4,7 @@ export * from "./sentry-query-format";
 export * from "./posthog-query-format";
 export * from "./posthog-hogql";
 export * from "./posthog-base-url";
-export * from "./desktop-posthog-provider-binding";
+export * from "./desktop-plugin-provider-binding";
 export * from "./desktop-error-source-provider.factory";
 export * from "./desktop-oauth-token-refresher";
 export * from "./desktop-sentry-project-selection";

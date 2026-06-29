@@ -1135,7 +1135,7 @@ exports.plugin = {
         {
           key: "baseUrl",
           storage: "configuration",
-          configurationKey: "posthogBaseUrl",
+          configurationKey: "baseUrl",
           label: "PostHog base URL",
           placeholder: POSTHOG_DEFAULT_BASE_URL,
           required: false,

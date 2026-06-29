@@ -26,7 +26,6 @@ export interface ErrorSourceConfiguration {
   baseUrl?: string;
   indexPatterns?: string[];
   sentryBaseUrl?: string;
-  posthogBaseUrl?: string;
   oauthClientId?: string;
   oauthClientSecret?: string;
   oauthRedirectUri?: string;

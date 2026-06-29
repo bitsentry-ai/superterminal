@@ -542,8 +542,10 @@ describe('desktop error source handlers', () => {
         state: 'state-1',
         clientId: 'client-id',
         name: 'OAuth PostHog',
-        projectIds: ['999'],
-        baseUrl: 'https://eu.posthog.com',
+        setupValues: {
+          projectIds: ['999'],
+          baseUrl: 'https://eu.posthog.com',
+        },
       }),
     ).resolves.toMatchObject({
       source: {

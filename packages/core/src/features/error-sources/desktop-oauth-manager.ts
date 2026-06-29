@@ -1,8 +1,7 @@
 import { spawn } from "child_process";
 import { createHash, randomBytes } from "crypto";
 import type { ErrorSourceType } from "./error-sources.schemas";
-import { getProviderForSource } from "./desktop-posthog-provider-binding";
-import { assertAllowedPostHogBaseUrl } from "./posthog-base-url";
+import { getProviderForSource } from "./desktop-plugin-provider-binding";
 
 export interface DesktopOAuthSettingsDatabase {
   setting: {
@@ -59,7 +58,6 @@ export interface InitiateOAuthInput {
   clientId?: string;
   redirectUri?: string;
   baseUrl?: string;
-  posthogBaseUrl?: string;
 }
 
 export interface CompleteOAuthInput {
@@ -70,7 +68,6 @@ export interface CompleteOAuthInput {
   clientSecret?: string;
   redirectUri?: string;
   baseUrl?: string;
-  posthogBaseUrl?: string;
 }
 
 export interface OAuthProviderConfig {
@@ -174,37 +171,12 @@ function isExpired(createdAt: string): boolean {
   return Date.now() - createdAtMs > OAUTH_STATE_TTL_MS;
 }
 
-function parsePostHogExtraAllowedHosts(): string[] {
-  const raw = process.env.POSTHOG_ALLOWED_BASE_URLS;
-  if (raw === undefined || raw.length === 0) return [];
-  const out: string[] = [];
-  for (const entry of raw.split(",")) {
-    const trimmed = entry.trim();
-    if (trimmed.length === 0) continue;
-    try {
-      out.push(new URL(trimmed).host.toLowerCase());
-    } catch {
-      out.push(trimmed.toLowerCase());
-    }
-  }
-  return out;
-}
-
-function readPostHogBaseUrl(input: {
-  baseUrl?: string;
-  posthogBaseUrl?: string;
-}): string | undefined {
-  const raw = input.baseUrl?.trim() ?? input.posthogBaseUrl?.trim() ?? "";
+function readBaseUrl(input: { baseUrl?: string } | undefined): string | undefined {
+  const raw = input?.baseUrl?.trim() ?? "";
   if (raw.length === 0) {
     return undefined;
   }
   return raw;
-}
-
-function validatePostHogOAuthBaseUrl(value: string | undefined): string {
-  return assertAllowedPostHogBaseUrl(value, {
-    extraAllowedHosts: parsePostHogExtraAllowedHosts(),
-  });
 }
 
 type ElectronShellLike = {
@@ -292,7 +264,7 @@ export interface DesktopOauthManagerProviderFactory {
     sourceType: ErrorSourceType;
     additionalMetadata?: unknown;
     configuration?: {
-      posthogBaseUrl?: unknown;
+      baseUrl?: unknown;
     };
   }) => DesktopOAuthProvider;
   getPlugin?: (
@@ -335,7 +307,7 @@ export function createDesktopOauthManagerBindings(): DesktopOauthManagerBindings
             sourceType: input.sourceType,
             additionalMetadata,
             configuration: {
-              posthogBaseUrl: input.providerBaseUrl,
+              baseUrl: input.providerBaseUrl,
             },
           });
         };
@@ -375,25 +347,6 @@ export class DesktopOauthManagerService {
     }
 
     return plugin.metadata.errorSource.oauth;
-  }
-
-  private hasMatchingErrorSourcePlugin(
-    sourceType: ErrorSourceType,
-    pluginId?: string,
-  ): boolean {
-    const normalizedPluginId = pluginId?.trim();
-    if (
-      normalizedPluginId === undefined ||
-      normalizedPluginId.length === 0 ||
-      this.options.resolvePluginDescriptor === undefined
-    ) {
-      return false;
-    }
-
-    return (
-      this.options.resolvePluginDescriptor(normalizedPluginId)?.metadata
-        ?.errorSource?.sourceType === sourceType
-    );
   }
 
   private getProviderConfig(
@@ -446,19 +399,7 @@ export class DesktopOauthManagerService {
       createHash("sha256").update(codeVerifier).digest(),
     );
 
-    let providerBaseUrl: string | undefined;
-    const pluginOwnsSourceType = this.hasMatchingErrorSourcePlugin(
-      sourceType,
-      pluginId,
-    );
-    if (sourceType === "posthog") {
-      const requestedBaseUrl = readPostHogBaseUrl(input ?? {});
-      if (pluginOwnsSourceType) {
-        providerBaseUrl = requestedBaseUrl;
-      } else {
-        providerBaseUrl = validatePostHogOAuthBaseUrl(requestedBaseUrl);
-      }
-    }
+    const providerBaseUrl = readBaseUrl(input);
     const provider = this.getProviderForOAuth(
       sourceType,
       pluginId,
@@ -536,47 +477,18 @@ export class DesktopOauthManagerService {
 
       const effectivePluginId = pending.pluginId ?? requestedPluginId;
       const config = this.getProviderConfig(sourceType, effectivePluginId);
-      const pluginOwnsSourceType = this.hasMatchingErrorSourcePlugin(
-        sourceType,
-        effectivePluginId,
-      );
-      let pendingBaseUrl: string | undefined;
-      if (
-        pending.sourceType === "posthog" &&
-        pending.providerBaseUrl !== undefined
-      ) {
-        if (pluginOwnsSourceType) {
-          pendingBaseUrl = pending.providerBaseUrl;
-        } else {
-          pendingBaseUrl = validatePostHogOAuthBaseUrl(pending.providerBaseUrl);
-        }
-      }
-      let requestedBaseUrl: string | undefined;
-      if (sourceType === "posthog") {
-        requestedBaseUrl = readPostHogBaseUrl({
-          baseUrl: input.baseUrl,
-          posthogBaseUrl: input.posthogBaseUrl,
-        });
-      }
-      let validatedRequestedBaseUrl: string | undefined;
-      if (sourceType === "posthog" && requestedBaseUrl !== undefined) {
-        if (pluginOwnsSourceType) {
-          validatedRequestedBaseUrl = requestedBaseUrl;
-        } else {
-          validatedRequestedBaseUrl =
-            validatePostHogOAuthBaseUrl(requestedBaseUrl);
-        }
-      }
+      const pendingBaseUrl = pending.providerBaseUrl;
+      const requestedBaseUrl = readBaseUrl(input);
       if (
         pendingBaseUrl !== undefined &&
-        validatedRequestedBaseUrl !== undefined &&
-        pendingBaseUrl !== validatedRequestedBaseUrl
+        requestedBaseUrl !== undefined &&
+        pendingBaseUrl !== requestedBaseUrl
       ) {
         throw new Error(
-          "PostHog OAuth base URL changed between authorization and token exchange",
+          "OAuth base URL changed between authorization and token exchange",
         );
       }
-      const providerBaseUrl = pendingBaseUrl ?? validatedRequestedBaseUrl;
+      const providerBaseUrl = pendingBaseUrl ?? requestedBaseUrl;
       const provider = this.getProviderForOAuth(
         sourceType,
         effectivePluginId,

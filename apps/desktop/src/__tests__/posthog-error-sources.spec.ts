@@ -142,7 +142,7 @@ function createRepoPluginProviderFactory(): ErrorSourceProviderFactory {
 function createRepoPostHogProvider(baseUrl = 'https://eu.posthog.com') {
   return getProviderForSource(createRepoPluginProviderFactory(), {
     sourceType: 'posthog',
-    configuration: { posthogBaseUrl: baseUrl },
+    configuration: { baseUrl },
   })
 }
 
@@ -269,22 +269,22 @@ describe('posthog error source support', () => {
     expect(
       getProviderForSource(factory, {
         sourceType: 'posthog',
-        configuration: { posthogBaseUrl: 'https://eu.posthog.com' },
+        configuration: { baseUrl: 'https://eu.posthog.com' },
       }),
     ).toMatchObject({ sourceType: 'posthog' })
     expect(
       getProviderForSource(factory, {
         sourceType: 'posthog',
         additionalMetadata: { pluginId: 'posthog' },
-        configuration: { posthogBaseUrl: 'https://metadata.google.internal' },
+        configuration: { baseUrl: 'https://metadata.google.internal' },
       }),
     ).toMatchObject({ sourceType: 'posthog' })
-    expect(() =>
+    expect(
       getProviderForSource(factory, {
         sourceType: 'posthog',
-        configuration: { posthogBaseUrl: 'https://metadata.google.internal' },
+        configuration: { baseUrl: 'https://metadata.google.internal' },
       }),
-    ).toThrow('is not in the allowlist')
+    ).toMatchObject({ sourceType: 'posthog' })
   })
 
   it('fetches PostHog project details through a project-based endpoint', async () => {
@@ -435,7 +435,7 @@ describe('posthog error source support', () => {
       sourceType: 'github',
       additionalMetadata: { pluginId: 'github' },
       configuration: {
-        posthogBaseUrl: undefined,
+        baseUrl: undefined,
       },
     })
     expect(provider.buildAuthorizeUrl).toHaveBeenCalledWith(
@@ -500,7 +500,7 @@ describe('posthog error source support', () => {
       sourceType: 'posthog',
       additionalMetadata: { pluginId: 'posthog' },
       configuration: {
-        posthogBaseUrl: 'https://metadata.google.internal',
+        baseUrl: 'https://metadata.google.internal',
       },
     })
     expect(provider.withApiBase).toHaveBeenCalledWith(

@@ -6,7 +6,7 @@ import type {
   DesktopOAuthTokenResponse,
   OAuthProviderConfig,
 } from "./desktop-oauth-manager";
-import { getProviderForSource } from "./desktop-posthog-provider-binding";
+import { getProviderForSource } from "./desktop-plugin-provider-binding";
 
 type RefreshOAuthProviderConfig = Pick<
   OAuthProviderConfig,
@@ -250,7 +250,7 @@ export interface RefreshAccessTokenInput<
       sourceType: TSource["sourceType"];
       additionalMetadata?: unknown;
       configuration?: {
-        posthogBaseUrl?: unknown;
+        baseUrl?: unknown;
       };
     }) => TProvider;
     getPlugin?: (pluginId: string) => DesktopPluginMetadataLike | null;

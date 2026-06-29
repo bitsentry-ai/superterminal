@@ -56,7 +56,7 @@ const artifact: DesktopRunbookExportArtifactV1 = {
       name: "Lumendesk PostHog",
       configuration: {
         orgSlug: "lumendesk",
-        posthogBaseUrl: "https://us.posthog.com",
+        baseUrl: "https://us.posthog.com",
         projectIds: ["123"],
       },
       credentials: {

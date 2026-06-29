@@ -63,8 +63,6 @@ const initiateOAuthPayloadSchema = z
     setupValues: handlerPayloadSchema.optional(),
     clientId: z.string().optional(),
     redirectUri: z.string().optional(),
-    baseUrl: z.string().optional(),
-    posthogBaseUrl: z.string().optional(),
   })
   .optional()
   .default({})
@@ -80,12 +78,6 @@ const completeOAuthPayloadSchema = z
     clientSecret: z.string().optional(),
     redirectUri: z.string().optional(),
     name: z.string().optional(),
-    orgSlug: z.string().optional(),
-    organizationId: z.string().optional(),
-    projectSlugs: z.array(z.string()).optional(),
-    projectIds: z.array(z.string()).optional(),
-    baseUrl: z.string().optional(),
-    posthogBaseUrl: z.string().optional(),
     additionalMetadata: handlerPayloadSchema.optional(),
     logLevelThreshold: z.enum(['error', 'warning', 'info', 'debug']).optional(),
     syncEnabled: z.boolean().optional(),
@@ -213,7 +205,6 @@ function readOAuthConfigurationOverrides(
 }
 
 function buildPluginOAuthConfiguration(input: {
-  payload: CompleteOAuthPayload
   persistedSetup: PersistedPluginSetup
   oauthClientId?: string
   oauthClientSecret?: string
@@ -221,28 +212,6 @@ function buildPluginOAuthConfiguration(input: {
 }): ErrorSourceConfiguration {
   const configuration: ErrorSourceConfiguration = {
     ...input.persistedSetup.configuration,
-  }
-  const baseUrl = readOptionalTrimmed(input.payload.baseUrl)
-  if (baseUrl !== undefined) {
-    configuration.baseUrl = baseUrl
-  }
-  const posthogBaseUrl = readOptionalTrimmed(input.payload.posthogBaseUrl)
-  if (posthogBaseUrl !== undefined) {
-    configuration.posthogBaseUrl = posthogBaseUrl
-  }
-  const orgSlug = readOptionalTrimmed(
-    input.payload.orgSlug ?? input.payload.organizationId,
-  )
-  if (orgSlug !== undefined) {
-    configuration.orgSlug = orgSlug
-  }
-  const projectIds = readStringArray(input.payload.projectIds)
-  if (projectIds.length > 0) {
-    configuration.projectIds = projectIds
-  }
-  const projectSlugs = readStringArray(input.payload.projectSlugs)
-  if (projectSlugs.length > 0) {
-    configuration.projectSlugs = projectSlugs
   }
   applyOptionalOAuthConfiguration(configuration, {
     oauthClientId: input.oauthClientId,
@@ -801,9 +770,7 @@ export function createDesktopErrorSourcesHandlers(
         payload.organizationSlug ?? payload.organizationId,
       )
       const pluginId = readPluginId(payload.pluginId) ?? sourceType
-      const baseUrl = readOptionalTrimmed(
-        payload.baseUrl ?? payload.posthogBaseUrl,
-      )
+      const baseUrl = readOptionalTrimmed(payload.baseUrl)
       const plugin = pluginRuntime.getPlugin(pluginId)
 
       log.info(
@@ -1031,10 +998,7 @@ export function createDesktopErrorSourcesHandlers(
         persistedSetup.configuration,
       )
       const baseUrl = readOptionalTrimmed(
-        payload.baseUrl ??
-          payload.posthogBaseUrl ??
-          persistedSetup.configuration.posthogBaseUrl ??
-          persistedSetup.configuration.baseUrl,
+        persistedSetup.configuration.baseUrl,
       )
       log.info(`[error-sources] initiateOAuth:start sourceType=${sourceType}`)
       return oauthManager.initiateOAuth(sourceType, {
@@ -1068,10 +1032,7 @@ export function createDesktopErrorSourcesHandlers(
         persistedSetup.configuration,
       )
       const oauthBaseUrl = readOptionalTrimmed(
-        payload.baseUrl ??
-          payload.posthogBaseUrl ??
-          persistedSetup.configuration.posthogBaseUrl ??
-          persistedSetup.configuration.baseUrl,
+        persistedSetup.configuration.baseUrl,
       )
 
       log.info(`[error-sources] completeOAuth:start sourceType=${sourceType}`)
@@ -1108,7 +1069,6 @@ export function createDesktopErrorSourcesHandlers(
         }
 
         const configuration = buildPluginOAuthConfiguration({
-          payload,
           persistedSetup,
           oauthClientId,
           oauthClientSecret,

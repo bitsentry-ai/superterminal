@@ -88,7 +88,7 @@ describe('PostHog code plugin', () => {
     const provider = getProviderForSource(new ErrorSourceProviderFactory(runtime), {
       sourceType: 'posthog',
       configuration: {
-        posthogBaseUrl: 'https://eu.posthog.com',
+        baseUrl: 'https://eu.posthog.com',
       },
     })
     const page = await provider.queryIssues({

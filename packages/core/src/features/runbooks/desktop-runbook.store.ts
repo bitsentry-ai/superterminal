@@ -255,7 +255,7 @@ function buildExternalSourceFingerprint(
     case "posthog":
       return `posthog::${stableSerialize({
         orgSlug: normalizeFingerprintSlug(config.orgSlug),
-        posthogBaseUrl: normalizeFingerprintBaseUrl(config.posthogBaseUrl),
+        baseUrl: normalizeFingerprintBaseUrl(config.baseUrl),
         projectIds: normalizeStringArray(config.projectIds),
       })}`;
     case "wazuh":
