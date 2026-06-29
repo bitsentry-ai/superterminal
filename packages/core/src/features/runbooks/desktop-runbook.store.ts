@@ -172,30 +172,6 @@ function normalizeStringArray(value: unknown): string[] {
   ].sort((left, right) => left.localeCompare(right));
 }
 
-function normalizeFingerprintBaseUrl(value: unknown): string | undefined {
-  const raw = asString(value).trim();
-  if (raw.length === 0) {
-    return undefined;
-  }
-
-  try {
-    const parsed = new URL(raw);
-    const pathname = parsed.pathname.replace(/\/+$/, "");
-    return `${parsed.origin.toLowerCase()}${pathname}`;
-  } catch {
-    return raw.replace(/\/+$/, "");
-  }
-}
-
-function normalizeFingerprintSlug(value: unknown): string | undefined {
-  const raw = asString(value).trim();
-  if (raw.length === 0) {
-    return undefined;
-  }
-
-  return raw.toLowerCase();
-}
-
 function toArtifactRefSlug(value: string): string {
   return value
     .trim()
@@ -243,33 +219,7 @@ function buildExternalSourceFingerprint(
   configuration: unknown,
 ): string {
   const config = sanitizeExportedErrorSourceConfiguration(configuration);
-
-  switch (sourceType) {
-    case "sentry":
-      return `sentry::${stableSerialize({
-        orgSlug: normalizeFingerprintSlug(config.orgSlug),
-        sentryBaseUrl: normalizeFingerprintBaseUrl(config.sentryBaseUrl),
-        projectIds: normalizeStringArray(config.projectIds),
-        projectSlugs: normalizeStringArray(config.projectSlugs),
-      })}`;
-    case "posthog":
-      return `posthog::${stableSerialize({
-        orgSlug: normalizeFingerprintSlug(config.orgSlug),
-        baseUrl: normalizeFingerprintBaseUrl(config.baseUrl),
-        projectIds: normalizeStringArray(config.projectIds),
-      })}`;
-    case "wazuh":
-      return `wazuh::${stableSerialize({
-        baseUrl: normalizeFingerprintBaseUrl(config.baseUrl),
-        indexPatterns: normalizeStringArray(config.indexPatterns),
-      })}`;
-    default:
-      return `${sourceType}::${stableSerialize(config)}`;
-  }
-}
-
-function requiresExternalSourceAuthToken(sourceType: string): boolean {
-  return sourceType === "sentry" || sourceType === "posthog";
+  return `${sourceType}::${stableSerialize(config)}`;
 }
 
 function normalizeExportedExternalSourceCredentials(value: unknown): {
@@ -2319,13 +2269,16 @@ export class DesktopRunbookStore {
         };
 
         if (
-          requiresExternalSourceAuthToken(source.sourceType) ||
           hasAccessTokenRef ||
-          hasRefreshTokenRef
+          hasRefreshTokenRef ||
+          source.expiresAt !== null ||
+          source.grantedScopes.length > 0
         ) {
           const credentials: NonNullable<typeof exportedSource.credentials> = {
-            authToken: "",
           };
+          if (hasAccessTokenRef) {
+            credentials.authToken = "";
+          }
           if (hasRefreshTokenRef) {
             credentials.refreshToken = "";
           }
@@ -2389,15 +2342,6 @@ export class DesktopRunbookStore {
       const credentials = normalizeExportedExternalSourceCredentials(
         externalSource.credentials,
       );
-
-      if (
-        requiresExternalSourceAuthToken(externalSource.sourceType) &&
-        credentials.authToken === undefined
-      ) {
-        throw new Error(
-          `External source "${externalSource.name}" does not match an existing local source and is missing authToken in the import YAML.`,
-        );
-      }
 
       if (options?.dryRun === true) {
         sourceIdByRef.set(externalSource.ref, externalSource.ref);

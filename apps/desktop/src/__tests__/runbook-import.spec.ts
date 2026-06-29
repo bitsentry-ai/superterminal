@@ -359,6 +359,65 @@ describe("RunbookStore importRunbooks", () => {
     });
   });
 
+  it("imports external sources without provider-specific auth enforcement", async () => {
+    const { store, db } = createStore();
+    const artifact: DesktopRunbookExportArtifactV1 = {
+      format: "bitsentry.runbooks.export",
+      version: 1,
+      exportedAt: "2026-05-31T00:00:00.000Z",
+      runbooks: [
+        {
+          title: "Retrieve errors from Jagad",
+          actions: [
+            {
+              type: "external_source",
+              title: "Query Sentry",
+              query: "is:unresolved level:error",
+              sourceRef: "jagad",
+              sourceName: "Jagad",
+              sourceType: "sentry",
+            },
+          ],
+        },
+      ],
+      externalSources: [
+        {
+          ref: "jagad",
+          sourceType: "sentry",
+          name: "Jagad",
+          configuration: {
+            orgSlug: "jagad",
+            projectSlugs: ["server"],
+          },
+        },
+      ],
+    };
+
+    const summary = await store.importRunbooks({
+      artifact,
+      options: { dryRun: false },
+    });
+
+    expect(summary).toMatchObject({
+      imported: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    const [createSourceCall] = db.errorSource.create.mock.calls;
+    expect(createSourceCall[0].data).toMatchObject({
+      sourceType: "sentry",
+      name: "Jagad",
+      accessTokenRef: null,
+      refreshTokenRef: null,
+    });
+    const [createRunbookActionCall] = db.runbookAction.create.mock.calls;
+    expect(createRunbookActionCall[0]).toMatchObject({
+      data: {
+        sourceId: createSourceCall[0].data.id,
+      },
+    });
+  });
+
   it("rejects external source actions that omit sourceRef", async () => {
     const { store } = createStore();
     const artifact: DesktopRunbookExportArtifactV1 = {
