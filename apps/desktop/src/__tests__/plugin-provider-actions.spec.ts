@@ -88,18 +88,10 @@ describe('plugin-backed error source provider actions', () => {
     ).toBe('queryIssues')
   })
 
-  it('resolves explicit provider action IDs from code plugin metadata', () => {
+  it('resolves StackStorm-style snake_case code action IDs', () => {
     const runtime = new TestPluginRuntimeService([
       createPluginDescriptor({
-        metadata: {
-          errorSource: {
-            sourceType: 'posthog',
-            setupFields: [],
-            providerActions: {
-              queryIssues: 'query_project_errors',
-            },
-          },
-        },
+        actions: [createProviderAction('query_issues')],
       }),
     ])
 
@@ -110,7 +102,7 @@ describe('plugin-backed error source provider actions', () => {
         sourceType: 'posthog',
         action: 'queryIssues',
       }),
-    ).toBe('query_project_errors')
+    ).toBe('query_issues')
   })
 
   it('does not register named providers without explicit code plugin actions', () => {
@@ -147,13 +139,13 @@ describe('plugin-backed error source provider actions', () => {
           },
         },
         actions: [
-          createProviderAction('listOrganizations'),
-          createProviderAction('listProjects'),
+          createProviderAction('list_organizations'),
+          createProviderAction('list_projects'),
         ],
       }),
     ])
     runtime.executeActionMock.mockImplementation((input) => {
-      if (input.actionId === 'listOrganizations') {
+      if (input.actionId === 'list_organizations') {
         return Promise.resolve({
           pluginId: input.pluginId,
           actionId: input.actionId,
@@ -192,7 +184,7 @@ describe('plugin-backed error source provider actions', () => {
       1,
       expect.objectContaining({
         pluginId: 'github',
-        actionId: 'listOrganizations',
+        actionId: 'list_organizations',
         auth: { accessToken: 'gh-token' },
       }),
     )
@@ -200,7 +192,7 @@ describe('plugin-backed error source provider actions', () => {
       2,
       expect.objectContaining({
         pluginId: 'github',
-        actionId: 'listProjects',
+        actionId: 'list_projects',
         auth: { accessToken: 'gh-token' },
         input: { orgSlug: 'bitsentry-ai' },
       }),

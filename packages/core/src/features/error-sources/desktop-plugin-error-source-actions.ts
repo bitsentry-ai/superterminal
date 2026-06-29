@@ -13,36 +13,27 @@ export type ErrorSourceProviderActionKey =
   | "listIssueEvents"
   | "searchAlerts";
 
-export const ERROR_SOURCE_PROVIDER_ACTION_KEYS = [
-  "buildAuthorizeUrl",
-  "exchangeCodeForToken",
-  "refreshToken",
-  "listOrganizations",
-  "listProjects",
-  "getProject",
-  "queryIssues",
-  "listIssues",
-  "listIssueEvents",
-  "searchAlerts",
-] as const satisfies readonly ErrorSourceProviderActionKey[];
+function toSnakeCase(action: ErrorSourceProviderActionKey): string {
+  return action.replace(/[A-Z]/g, (character) => `_${character.toLowerCase()}`);
+}
 
-function hasConventionalActionId(
+function resolveConventionalActionId(
   plugin: DesktopPluginDescriptor,
   action: ErrorSourceProviderActionKey,
-): boolean {
-  return plugin.actions.some((candidate) => candidate.id === action);
+): string | undefined {
+  const snakeCaseAction = toSnakeCase(action);
+  const match = plugin.actions.find(
+    (candidate) => candidate.id === action || candidate.id === snakeCaseAction,
+  );
+
+  return match?.id;
 }
 
 export function hasErrorSourceProviderAction(
   plugin: DesktopPluginDescriptor,
   action: ErrorSourceProviderActionKey,
 ): boolean {
-  const configured = plugin.metadata?.errorSource?.providerActions?.[action];
-  if (typeof configured === "string" && configured.trim().length > 0) {
-    return true;
-  }
-
-  return hasConventionalActionId(plugin, action);
+  return resolveConventionalActionId(plugin, action) !== undefined;
 }
 
 export function resolveErrorSourceProviderActionId(input: {
@@ -52,17 +43,11 @@ export function resolveErrorSourceProviderActionId(input: {
   action: ErrorSourceProviderActionKey;
 }): string {
   const plugin = input.runtime.getPlugin(input.pluginId);
-  const configured =
-    plugin?.metadata?.errorSource?.providerActions?.[input.action];
-  if (typeof configured === "string" && configured.trim().length > 0) {
-    return configured.trim();
-  }
-
-  if (
-    plugin?.metadata?.errorSource?.sourceType === input.sourceType &&
-    hasConventionalActionId(plugin, input.action)
-  ) {
-    return input.action;
+  if (plugin?.metadata?.errorSource?.sourceType === input.sourceType) {
+    const actionId = resolveConventionalActionId(plugin, input.action);
+    if (actionId !== undefined) {
+      return actionId;
+    }
   }
 
   throw new Error(

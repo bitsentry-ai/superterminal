@@ -404,10 +404,6 @@ exports.plugin = {
           control: "multiline_list",
         },
       ],
-      providerActions: {
-        queryIssues: "query_issues",
-        searchAlerts: "search_alerts",
-      },
     },
   },
   auth: {

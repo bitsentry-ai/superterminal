@@ -72,23 +72,28 @@ const posthogPluginDescriptor: DesktopPluginDescriptor = {
     errorSource: {
       sourceType: 'posthog',
       setupFields: [],
-      providerActions: {
-        buildAuthorizeUrl: 'build_authorize_url',
-        exchangeCodeForToken: 'exchange_code_for_token',
-        refreshToken: 'refresh_token',
-        listOrganizations: 'list_organizations',
-        listProjects: 'list_projects',
-        getProject: 'get_project',
-        queryIssues: 'query_issues',
-        listIssues: 'list_issues',
-        listIssueEvents: 'list_issue_events',
-      },
     },
   },
   auth: {
     fields: [],
   },
-  actions: [],
+  actions: [
+    'build_authorize_url',
+    'exchange_code_for_token',
+    'refresh_token',
+    'list_organizations',
+    'list_projects',
+    'get_project',
+    'query_issues',
+    'list_issues',
+    'list_issue_events',
+  ].map((id) => ({
+    id,
+    title: id,
+    description: `${id} action.`,
+    riskLevel: 'read',
+    fields: [],
+  })),
   triggers: [],
 }
 

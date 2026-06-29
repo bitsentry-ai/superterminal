@@ -225,23 +225,6 @@ export type DesktopPluginErrorSourceSetupField = z.infer<
   typeof desktopPluginErrorSourceSetupFieldSchema
 >;
 
-export const desktopPluginErrorSourceProviderActionsSchema = z.object({
-  buildAuthorizeUrl: z.string().min(1).optional(),
-  exchangeCodeForToken: z.string().min(1).optional(),
-  refreshToken: z.string().min(1).optional(),
-  listOrganizations: z.string().min(1).optional(),
-  listProjects: z.string().min(1).optional(),
-  getProject: z.string().min(1).optional(),
-  queryIssues: z.string().min(1).optional(),
-  listIssues: z.string().min(1).optional(),
-  listIssueEvents: z.string().min(1).optional(),
-  searchAlerts: z.string().min(1).optional(),
-});
-
-export type DesktopPluginErrorSourceProviderActions = z.infer<
-  typeof desktopPluginErrorSourceProviderActionsSchema
->;
-
 export const desktopPluginErrorSourceOauthSchema = z.object({
   envClientIdName: z.string().min(1).optional(),
   envClientSecretName: z.string().min(1).optional(),
@@ -260,7 +243,6 @@ export const desktopPluginDescriptorMetadataSchema = z.object({
     .object({
       sourceType: desktopPluginErrorSourceTypeSchema,
       setupFields: z.array(desktopPluginErrorSourceSetupFieldSchema).default([]),
-      providerActions: desktopPluginErrorSourceProviderActionsSchema.optional(),
       oauth: desktopPluginErrorSourceOauthSchema.optional(),
     })
     .optional(),

@@ -27,18 +27,21 @@ describe('PostHog code plugin', () => {
     const runtime = createDesktopNodePluginRuntimeService([pluginDirectory])
     const descriptor = runtime.getPlugin('posthog')
 
+    if (descriptor === null) {
+      throw new Error('Expected PostHog plugin to load')
+    }
+
     expect(descriptor).toMatchObject({
       id: 'posthog',
       metadata: {
         errorSource: {
           sourceType: 'posthog',
-          providerActions: {
-            queryIssues: 'query_issues',
-            listIssueEvents: 'list_issue_events',
-          },
         },
       },
     })
+    const actionIds = descriptor.actions.map((action) => action.id)
+    expect(actionIds).toContain('query_issues')
+    expect(actionIds).toContain('list_issue_events')
 
     const fetchMock = vi.fn<(url: string, request?: RequestInit) => Promise<Response>>().mockResolvedValue(
       new Response(

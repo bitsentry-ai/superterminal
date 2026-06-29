@@ -34,6 +34,18 @@ class TestPluginRuntimeService extends DesktopPluginRuntimeService {
   }
 }
 
+function createProviderAction(
+  id: string,
+): DesktopPluginDescriptor['actions'][number] {
+  return {
+    id,
+    title: id,
+    description: `${id} action.`,
+    riskLevel: 'read',
+    fields: [],
+  }
+}
+
 function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
   return {
     id: 'posthog',
@@ -52,10 +64,6 @@ function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
             control: 'password',
           },
         ],
-        providerActions: {
-          exchangeCodeForToken: 'exchange_code_for_token',
-          queryIssues: 'query_issues',
-        },
       },
     },
     auth: {
@@ -68,7 +76,10 @@ function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
         },
       ],
     },
-    actions: [],
+    actions: [
+      createProviderAction('exchange_code_for_token'),
+      createProviderAction('query_issues'),
+    ],
     triggers: [],
   }
 }

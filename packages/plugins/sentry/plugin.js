@@ -520,16 +520,6 @@ exports.plugin = {
           control: "multiline_list",
         },
       ],
-      providerActions: {
-        buildAuthorizeUrl: "build_authorize_url",
-        exchangeCodeForToken: "exchange_code_for_token",
-        refreshToken: "refresh_token",
-        listOrganizations: "list_organizations",
-        listProjects: "list_projects",
-        queryIssues: "query_issues",
-        listIssues: "list_issues",
-        listIssueEvents: "list_issue_events",
-      },
       oauth: {
         envClientIdName: "SENTRY_CLIENT_ID",
         envClientSecretName: "SENTRY_CLIENT_SECRET",

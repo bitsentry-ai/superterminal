@@ -604,18 +604,6 @@ export interface PluginTriggerDefinition {
 export interface PluginErrorSourceMetadata {
   sourceType: ErrorSourceType;
   setupFields: PluginErrorSourceSetupField[];
-  providerActions?: {
-    buildAuthorizeUrl?: string;
-    exchangeCodeForToken?: string;
-    refreshToken?: string;
-    listOrganizations?: string;
-    listProjects?: string;
-    getProject?: string;
-    queryIssues?: string;
-    listIssues?: string;
-    listIssueEvents?: string;
-    searchAlerts?: string;
-  };
   oauth?: {
     envClientIdName?: string;
     envClientSecretName?: string;

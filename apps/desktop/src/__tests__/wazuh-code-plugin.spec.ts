@@ -27,18 +27,21 @@ describe('Wazuh code plugin', () => {
     const runtime = createDesktopNodePluginRuntimeService([pluginDirectory])
     const descriptor = runtime.getPlugin('wazuh')
 
+    if (descriptor === null) {
+      throw new Error('Expected Wazuh plugin to load')
+    }
+
     expect(descriptor).toMatchObject({
       id: 'wazuh',
       metadata: {
         errorSource: {
           sourceType: 'wazuh',
-          providerActions: {
-            queryIssues: 'query_issues',
-            searchAlerts: 'search_alerts',
-          },
         },
       },
     })
+    const actionIds = descriptor.actions.map((action) => action.id)
+    expect(actionIds).toContain('query_issues')
+    expect(actionIds).toContain('search_alerts')
 
     const fetchMock = vi.fn<(url: string, request?: RequestInit) => Promise<Response>>().mockImplementation(
       () => Promise.resolve(new Response(

@@ -62,6 +62,18 @@ function makeSentrySource(overrides: Partial<ErrorSource> = {}): ErrorSource {
   }
 }
 
+function createProviderAction(
+  id: string,
+): DesktopPluginDescriptor['actions'][number] {
+  return {
+    id,
+    title: id,
+    description: `${id} action.`,
+    riskLevel: 'read',
+    fields: [],
+  }
+}
+
 function createWazuhDescriptor(): DesktopPluginDescriptor {
   return {
     id: 'wazuh',
@@ -99,16 +111,15 @@ function createWazuhDescriptor(): DesktopPluginDescriptor {
             control: 'multiline_list',
           },
         ],
-        providerActions: {
-          queryIssues: 'query_issues',
-          searchAlerts: 'search_alerts',
-        },
       },
     },
     auth: {
       fields: [],
     },
-    actions: [],
+    actions: [
+      createProviderAction('query_issues'),
+      createProviderAction('search_alerts'),
+    ],
     triggers: [],
   }
 }
@@ -150,15 +161,12 @@ function createSentryDescriptor(): DesktopPluginDescriptor {
             control: 'multiline_list',
           },
         ],
-        providerActions: {
-          queryIssues: 'query_issues',
-        },
       },
     },
     auth: {
       fields: [],
     },
-    actions: [],
+    actions: [createProviderAction('query_issues')],
     triggers: [],
   }
 }
