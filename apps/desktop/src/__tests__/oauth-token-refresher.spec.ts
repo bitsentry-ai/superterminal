@@ -45,7 +45,7 @@ describe('refreshSourceAccessToken', () => {
     expect(getProvider).not.toHaveBeenCalled()
   })
 
-  it('refreshes non-built-in code plugin sources from plugin OAuth metadata', async () => {
+  it('refreshes marketplace-style code plugin sources from plugin OAuth metadata', async () => {
     const refreshToken = vi.fn().mockResolvedValue({
       accessToken: 'refreshed-github-access-token',
       refreshToken: 'refreshed-github-refresh-token',
@@ -126,7 +126,7 @@ describe('refreshSourceAccessToken', () => {
     )
   })
 
-  it('does not fall back to built-in OAuth refresh config', async () => {
+  it('does not fall back to host-owned OAuth refresh config', async () => {
     const provider = {
       refreshToken: vi.fn(),
     }

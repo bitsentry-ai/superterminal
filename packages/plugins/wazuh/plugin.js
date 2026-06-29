@@ -17,6 +17,71 @@ function readRecord(value) {
   return value;
 }
 
+function readRecordOrEmpty(value) {
+  return readRecord(value) ?? {};
+}
+
+function readStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function resolveWazuhErrorSourceSetup(context) {
+  const setupValues = readRecordOrEmpty(context.setupValues);
+  const indexUrl = readString(setupValues.indexUrl);
+  const indexPassword = readString(setupValues.indexPassword);
+  const indexPatterns = readStringArray(setupValues.indexPatterns);
+  const configuration = {};
+  if (indexUrl.length > 0) {
+    configuration.baseUrl = indexUrl;
+  }
+  if (indexPatterns.length > 0) {
+    configuration.indexPatterns = indexPatterns;
+  }
+
+  return {
+    accessTokenRef: indexPassword.length > 0 ? indexPassword : undefined,
+    configuration,
+  };
+}
+
+function buildWazuhErrorSourceAuthFromParts(accessTokenRef, configuration) {
+  const config = readRecordOrEmpty(configuration);
+  const auth = { ...config };
+  const baseUrl = readString(config.baseUrl);
+  if (baseUrl.length > 0) {
+    auth.indexUrl = baseUrl;
+  }
+  const indexPassword = readString(accessTokenRef);
+  if (indexPassword.length > 0) {
+    auth.indexPassword = indexPassword;
+  }
+
+  return auth;
+}
+
+function buildWazuhErrorSourceAuth(context) {
+  const source = readRecordOrEmpty(context.source);
+  return buildWazuhErrorSourceAuthFromParts(
+    source.accessTokenRef,
+    source.configuration,
+  );
+}
+
+function buildWazuhErrorSourceProbeAuth(context) {
+  const persistedSetup = readRecordOrEmpty(context.persistedSetup);
+  return buildWazuhErrorSourceAuthFromParts(
+    persistedSetup.accessTokenRef,
+    persistedSetup.configuration,
+  );
+}
+
 function readIsoTimestamp(value) {
   const raw = readString(value);
   const parsed = new Date(raw);
@@ -373,8 +438,6 @@ exports.plugin = {
       setupFields: [
         {
           key: "indexUrl",
-          storage: "configuration",
-          configurationKey: "baseUrl",
           label: "Wazuh index URL",
           placeholder: "https://wazuh.example.com:9200",
           description: "OpenSearch/Indexer base URL for Wazuh alerts.",
@@ -383,7 +446,6 @@ exports.plugin = {
         },
         {
           key: "indexPassword",
-          storage: "accessTokenRef",
           label: "Wazuh index password",
           description:
             "Password for the Wazuh index user. The username defaults to admin.",
@@ -392,8 +454,6 @@ exports.plugin = {
         },
         {
           key: "indexPatterns",
-          storage: "configuration",
-          configurationKey: "indexPatterns",
           label: "Index patterns",
           placeholder: "wazuh-alerts-*",
           description: "Comma or newline separated Wazuh index patterns.",
@@ -402,6 +462,11 @@ exports.plugin = {
         },
       ],
     },
+  },
+  errorSource: {
+    resolveSetup: resolveWazuhErrorSourceSetup,
+    buildAuth: buildWazuhErrorSourceAuth,
+    buildProbeAuth: buildWazuhErrorSourceProbeAuth,
   },
   auth: {
     fields: [

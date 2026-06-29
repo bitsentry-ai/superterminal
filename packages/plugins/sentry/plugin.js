@@ -80,6 +80,68 @@ function parseJsonArray(payload) {
   );
 }
 
+function readRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value;
+}
+
+function resolveSentryErrorSourceSetup(context) {
+  const setupValues = readRecord(context.setupValues);
+  const authToken = readString(setupValues.authToken);
+  const orgSlug = readString(
+    setupValues.orgSlug,
+    readString(setupValues.organizationSlug),
+  );
+  const projectSlugs = readStringArray(setupValues.projectSlugs);
+  const configuration = {};
+  if (orgSlug.length > 0) {
+    configuration.orgSlug = orgSlug;
+  }
+  if (projectSlugs.length > 0) {
+    configuration.projectSlugs = projectSlugs;
+  }
+
+  return {
+    accessTokenRef: authToken.length > 0 ? authToken : undefined,
+    configuration,
+  };
+}
+
+function buildSentryErrorSourceAuthFromParts(accessTokenRef, configuration) {
+  const config = readRecord(configuration);
+  const auth = { ...config };
+  const accessToken = readString(accessTokenRef);
+  if (accessToken.length > 0) {
+    auth.authToken = accessToken;
+    auth.accessToken = accessToken;
+  }
+  const orgSlug = readString(config.orgSlug);
+  if (orgSlug.length > 0) {
+    auth.organizationSlug = orgSlug;
+  }
+
+  return auth;
+}
+
+function buildSentryErrorSourceAuth(context) {
+  const source = readRecord(context.source);
+  return buildSentryErrorSourceAuthFromParts(
+    source.accessTokenRef,
+    source.configuration,
+  );
+}
+
+function buildSentryErrorSourceProbeAuth(context) {
+  const persistedSetup = readRecord(context.persistedSetup);
+  return buildSentryErrorSourceAuthFromParts(
+    persistedSetup.accessTokenRef,
+    persistedSetup.configuration,
+  );
+}
+
 function parseErrorBody(raw) {
   if (raw.length === 0) {
     return "Unknown Sentry API error";
@@ -492,16 +554,13 @@ exports.plugin = {
       setupFields: [
         {
           key: "authToken",
-          storage: "accessTokenRef",
           label: "Sentry auth token",
           description: "User auth token or OAuth access token for Sentry.",
           required: true,
           control: "password",
         },
         {
-          key: "organizationSlug",
-          storage: "configuration",
-          configurationKey: "orgSlug",
+          key: "orgSlug",
           label: "Organization slug",
           placeholder: "acme",
           required: true,
@@ -509,8 +568,6 @@ exports.plugin = {
         },
         {
           key: "projectSlugs",
-          storage: "configuration",
-          configurationKey: "projectSlugs",
           label: "Project slugs",
           placeholder: "api\nworker",
           required: false,
@@ -525,6 +582,12 @@ exports.plugin = {
         scopes: ["org:read", "project:read", "event:read"],
       },
     },
+  },
+  errorSource: {
+    resolveSetup: resolveSentryErrorSourceSetup,
+    buildAuth: buildSentryErrorSourceAuth,
+    buildProbeAuth: buildSentryErrorSourceProbeAuth,
+    probeProjectIdentity: "slug",
   },
   auth: {
     fields: [

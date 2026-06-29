@@ -1,5 +1,4 @@
 const POSTHOG_DEFAULT_BASE_URL = "https://us.posthog.com";
-const POSTHOG_ALLOWED_HOSTS = new Set(["us.posthog.com", "eu.posthog.com"]);
 const DEFAULT_ISSUES_LIMIT = 50;
 const DEFAULT_EVENTS_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -39,6 +38,72 @@ function readStringArray(value) {
     .filter((item) => item.length > 0);
 }
 
+function readRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value;
+}
+
+function resolvePostHogErrorSourceSetup(context) {
+  const setupValues = readRecord(context.setupValues);
+  const authToken = readString(setupValues.authToken);
+  const baseUrl = readString(setupValues.baseUrl);
+  const orgSlug = readString(
+    setupValues.orgSlug,
+    readString(setupValues.organizationId),
+  );
+  const projectIds = readStringArray(setupValues.projectIds);
+  const configuration = {};
+  if (baseUrl.length > 0) {
+    configuration.baseUrl = baseUrl;
+  }
+  if (orgSlug.length > 0) {
+    configuration.orgSlug = orgSlug;
+  }
+  if (projectIds.length > 0) {
+    configuration.projectIds = projectIds;
+  }
+
+  return {
+    accessTokenRef: authToken.length > 0 ? authToken : undefined,
+    configuration,
+  };
+}
+
+function buildPostHogErrorSourceAuthFromParts(accessTokenRef, configuration) {
+  const config = readRecord(configuration);
+  const auth = { ...config };
+  const accessToken = readString(accessTokenRef);
+  if (accessToken.length > 0) {
+    auth.authToken = accessToken;
+    auth.accessToken = accessToken;
+  }
+  const orgSlug = readString(config.orgSlug);
+  if (orgSlug.length > 0) {
+    auth.organizationId = orgSlug;
+  }
+
+  return auth;
+}
+
+function buildPostHogErrorSourceAuth(context) {
+  const source = readRecord(context.source);
+  return buildPostHogErrorSourceAuthFromParts(
+    source.accessTokenRef,
+    source.configuration,
+  );
+}
+
+function buildPostHogErrorSourceProbeAuth(context) {
+  const persistedSetup = readRecord(context.persistedSetup);
+  return buildPostHogErrorSourceAuthFromParts(
+    persistedSetup.accessTokenRef,
+    persistedSetup.configuration,
+  );
+}
+
 function boundedLimit(value, fallback) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.max(1, Math.min(MAX_LIMIT, Math.trunc(value)));
@@ -47,46 +112,18 @@ function boundedLimit(value, fallback) {
   return fallback;
 }
 
-function parseExtraAllowedHosts() {
-  const raw = process.env.POSTHOG_ALLOWED_BASE_URLS;
-  if (typeof raw !== "string" || raw.trim().length === 0) {
-    return [];
-  }
-
-  return raw
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0)
-    .map((item) => {
-      try {
-        return new URL(item).host.toLowerCase();
-      } catch {
-        return item.toLowerCase();
-      }
-    });
-}
-
-function assertAllowedPostHogBaseUrl(baseUrl) {
+function resolvePostHogBaseUrl(baseUrl) {
   const normalized = readString(baseUrl, POSTHOG_DEFAULT_BASE_URL);
   const parsed = new URL(normalized);
-  if (parsed.protocol !== "https:") {
-    throw new Error("PostHog base URL must use https://");
-  }
-
-  const allowedHosts = new Set([
-    ...POSTHOG_ALLOWED_HOSTS,
-    ...parseExtraAllowedHosts(),
-  ]);
-  const host = parsed.host.toLowerCase();
-  if (!allowedHosts.has(host)) {
-    throw new Error(`PostHog base URL host "${host}" is not in the allowlist`);
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error("PostHog base URL must use http:// or https://");
   }
 
   return parsed.origin;
 }
 
 function readApiBase(auth) {
-  return assertAllowedPostHogBaseUrl(auth.baseUrl ?? auth.apiBase);
+  return resolvePostHogBaseUrl(auth.baseUrl ?? auth.apiBase);
 }
 
 function oauthUrl(auth, pathname) {
@@ -1127,32 +1164,25 @@ exports.plugin = {
       setupFields: [
         {
           key: "authToken",
-          storage: "accessTokenRef",
           label: "PostHog personal API key",
           required: true,
           control: "password",
         },
         {
           key: "baseUrl",
-          storage: "configuration",
-          configurationKey: "baseUrl",
           label: "PostHog base URL",
           placeholder: POSTHOG_DEFAULT_BASE_URL,
           required: false,
           control: "text",
         },
         {
-          key: "organizationId",
-          storage: "configuration",
-          configurationKey: "orgSlug",
+          key: "orgSlug",
           label: "Organization ID",
           required: false,
           control: "text",
         },
         {
           key: "projectIds",
-          storage: "configuration",
-          configurationKey: "projectIds",
           label: "Project IDs",
           placeholder: "177710\n177711",
           required: false,
@@ -1168,6 +1198,11 @@ exports.plugin = {
         publicClient: true,
       },
     },
+  },
+  errorSource: {
+    resolveSetup: resolvePostHogErrorSourceSetup,
+    buildAuth: buildPostHogErrorSourceAuth,
+    buildProbeAuth: buildPostHogErrorSourceProbeAuth,
   },
   auth: {
     fields: [

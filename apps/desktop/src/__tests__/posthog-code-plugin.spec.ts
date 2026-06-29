@@ -88,7 +88,7 @@ describe('PostHog code plugin', () => {
     const provider = getProviderForSource(new ErrorSourceProviderFactory(runtime), {
       sourceType: 'posthog',
       configuration: {
-        baseUrl: 'https://eu.posthog.com',
+        baseUrl: 'https://self-hosted.posthog.internal',
       },
     })
     const page = await provider.queryIssues({
@@ -118,7 +118,7 @@ describe('PostHog code plugin', () => {
     }
 
     const [url, request] = firstCall
-    expect(url).toBe('https://eu.posthog.com/api/projects/177710/query/')
+    expect(url).toBe('https://self-hosted.posthog.internal/api/projects/177710/query/')
     expect(request?.method).toBe('POST')
     expect(request?.headers).toMatchObject({
       Authorization: 'Bearer phx-token',

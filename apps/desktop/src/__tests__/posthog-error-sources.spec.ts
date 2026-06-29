@@ -229,13 +229,13 @@ describe('posthog error source support', () => {
       getProviderForSource(factory, {
         sourceType: 'posthog',
         additionalMetadata: { pluginId: 'posthog' },
-        configuration: { baseUrl: 'https://metadata.google.internal' },
+        configuration: { baseUrl: 'https://self-hosted.posthog.internal' },
       }),
     ).toMatchObject({ sourceType: 'posthog' })
     expect(
       getProviderForSource(factory, {
         sourceType: 'posthog',
-        configuration: { baseUrl: 'https://metadata.google.internal' },
+        configuration: { baseUrl: 'https://self-hosted.posthog.internal' },
       }),
     ).toMatchObject({ sourceType: 'posthog' })
   })
@@ -336,7 +336,7 @@ describe('posthog error source support', () => {
     expect(requestBodyText(refreshRequestInit?.body)).toContain('grant_type=refresh_token')
   })
 
-  it('starts OAuth for non-built-in code plugin source types', async () => {
+  it('starts OAuth for marketplace-style code plugin source types', async () => {
     const upsertSetting = vi.fn<DbClient['setting']['upsert']>().mockResolvedValue({})
     const db = {
       setting: {
@@ -405,7 +405,7 @@ describe('posthog error source support', () => {
     })
   })
 
-  it('starts OAuth for built-in-named code plugins without PostHog base URL allowlist', async () => {
+  it('starts OAuth for legacy-named code plugins without host-owned base URL restrictions', async () => {
     const upsertSetting = vi.fn<DbClient['setting']['upsert']>().mockResolvedValue({})
     const db = {
       setting: {
@@ -445,7 +445,7 @@ describe('posthog error source support', () => {
     const initiated = await manager.initiateOAuth('posthog', {
       pluginId: 'posthog',
       clientId: 'client-id',
-      baseUrl: 'https://metadata.google.internal',
+      baseUrl: 'https://self-hosted.posthog.internal',
     })
 
     expect(initiated.authUrl).toBe('https://posthog.example/oauth?state=state-1')
@@ -453,21 +453,21 @@ describe('posthog error source support', () => {
       sourceType: 'posthog',
       additionalMetadata: { pluginId: 'posthog' },
       configuration: {
-        baseUrl: 'https://metadata.google.internal',
+        baseUrl: 'https://self-hosted.posthog.internal',
       },
     })
     expect(provider.withApiBase).toHaveBeenCalledWith(
-      'https://metadata.google.internal',
+      'https://self-hosted.posthog.internal',
     )
     const upsertInput = upsertSetting.mock.calls[0][0]
     expect(JSON.parse(String(upsertInput.create.value))).toMatchObject({
       sourceType: 'posthog',
       pluginId: 'posthog',
-      providerBaseUrl: 'https://metadata.google.internal',
+      providerBaseUrl: 'https://self-hosted.posthog.internal',
     })
   })
 
-  it('rejects built-in-named code plugins without plugin OAuth metadata', async () => {
+  it('rejects legacy-named code plugins without plugin OAuth metadata', async () => {
     const db = {
       setting: {
         findMany: vi.fn().mockResolvedValue([]),
