@@ -278,6 +278,35 @@ describe('desktop error source handlers', () => {
     })
   })
 
+  it('rejects source creation without a matching code plugin', async () => {
+    const runtime = new TestPluginRuntimeService([])
+    const { db, create } = createTestDb()
+    const oauthBindings = createDesktopOauthManagerBindings(
+      'bitsentry-desktop-ce://oauth/callback',
+    )
+    const handlers = createDesktopErrorSourcesHandlers(db, {
+      OauthManagerService: oauthBindings.OauthManagerService,
+      pluginRuntime: runtime,
+    })
+
+    await expect(
+      handlers['errorSources:create']?.({
+        pluginId: 'github',
+        sourceType: 'github',
+        name: 'GitHub Issues',
+        setupValues: {
+          accessToken: 'gh-token',
+        },
+        configuration: {
+          defaultQuery: 'is:issue is:open',
+        },
+      }),
+    ).rejects.toThrow(
+      'Error source plugin "github" does not match source type github',
+    )
+    expect(create).not.toHaveBeenCalled()
+  })
+
   it('updates built-in-named sources through matching code plugin metadata', async () => {
     vi.useFakeTimers()
     const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])

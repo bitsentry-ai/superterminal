@@ -561,17 +561,6 @@ function readStringArray(value: unknown): string[] {
   })
 }
 
-function firstNonEmptyStringArray(readers: Array<() => string[]>): string[] {
-  for (const reader of readers) {
-    const values = reader()
-    if (values.length > 0) {
-      return values
-    }
-  }
-
-  return []
-}
-
 function readPluginConnectionIndexPattern(
   configuration: ErrorSourceConfiguration,
 ): string | undefined {
@@ -774,27 +763,6 @@ export function createDesktopErrorSourcesHandlers(
     })
   }
 
-  function getPostHogProviderForBaseUrl(
-    baseUrl: string,
-    pluginId = 'posthog',
-  ): PostHogProjectProvider {
-    // Re-run the allowlist on the caller-supplied URL here too - the call
-    // sites should already validate, but treating this helper as a single
-    // chokepoint keeps the invariant locally enforceable and means a future
-    // caller can't sneak past validation.
-    const validated = validatePostHogBaseUrl(baseUrl)
-    const base = getProviderForSource(providerFactory, {
-      sourceType: 'posthog',
-      additionalMetadata: { pluginId },
-      configuration: { posthogBaseUrl: validated },
-    })
-    if (hasPostHogProjectAccess(base)) {
-      return base
-    }
-
-    throw new Error('PostHog provider does not support project-based lookups')
-  }
-
   function filterProbeOrganizations<T extends { slug: string }>(
     orgs: T[],
     requestedOrgSlug: string | undefined,
@@ -904,7 +872,6 @@ export function createDesktopErrorSourcesHandlers(
       return toRendererErrorSource(source)
     },
 
-    // eslint-disable-next-line sonarjs/cognitive-complexity -- Create preserves provider-specific validation and project resolution in one write path.
     'errorSources:create': async (rawPayload: unknown) => {
       const payload = readCreateErrorSourcePayload(rawPayload)
       const sourceType = payload.sourceType
@@ -921,318 +888,16 @@ export function createDesktopErrorSourcesHandlers(
         sourceType,
       )
       const authToken =
-        readSetupTrimmed(setupValues, 'authToken') ??
-        payload.authToken?.trim() ??
-        persistedSetup.accessTokenRef ??
-        ''
+	        readSetupTrimmed(setupValues, 'authToken') ??
+	        payload.authToken?.trim() ??
+	        persistedSetup.accessTokenRef ??
+	        ''
       const sourceName = payload.name
 
-      if (!usePluginCreatePath && sourceType === 'sentry') {
-        const organizationSlug =
-          readSetupTrimmed(setupValues, 'organizationSlug') ??
-          readSetupTrimmed(setupValues, 'organizationId') ??
-          readOptionalTrimmed(persistedSetup.configuration.orgSlug) ??
-          payload.organizationSlug?.trim() ??
-          ''
-        const projectSlugs = firstNonEmptyStringArray([
-          () => readSetupStringArray(setupValues, 'projectSlugs'),
-          () => readStringArray(persistedSetup.configuration.projectSlugs),
-          () => readStringArray(payload.projectSlugs),
-        ])
-        const sentryBaseUrl = readOptionalTrimmed(
-          setupValues.baseUrl ?? payload.sentryBaseUrl,
+      if (!usePluginCreatePath) {
+        throw new Error(
+          `Error source plugin "${pluginId}" does not match source type ${sourceType}`,
         )
-
-        if (authToken.length === 0) {
-          log.warn('[error-sources] create: missing authToken')
-          throw new Error('authToken is required')
-        }
-        if (organizationSlug.length === 0) {
-          log.warn('[error-sources] create: missing organizationSlug')
-          throw new Error('organizationSlug is required')
-        }
-
-        log.info(
-          `[error-sources] create:start type=sentry name="${sourceName}" org="${organizationSlug}" projects=${String(projectSlugs.length)}`,
-        )
-
-        try {
-          const additionalConfig = {
-            ...persistedSetup.configuration,
-            ...(payload.configuration ?? {}),
-          }
-          const provider = getProviderForSource(providerFactory, {
-            sourceType,
-            additionalMetadata: { pluginId },
-          })
-          const projects = await provider.listProjects({
-            accessToken: authToken,
-            orgSlug: organizationSlug,
-          })
-          const resolvedProjects = resolveSentryProjectSelection(projects, {
-            projectIds: readConfiguredProjectIds(additionalConfig),
-            projectSlugs,
-            defaultToAll: projectSlugs.length === 0,
-          })
-          if (resolvedProjects.missingProjectSlugs.length > 0) {
-            throw new Error(
-              `Unknown Sentry project slug(s): ${resolvedProjects.missingProjectSlugs.join(', ')}`,
-            )
-          }
-
-          const created = await sourcesRepository.create({
-            sourceType,
-            name: sourceName,
-            additionalMetadata: mergeErrorSourceAdditionalMetadata(
-              readPayloadRecord(payload.additionalMetadata),
-              pluginId,
-            ),
-            accessTokenRef: authToken,
-            refreshTokenRef: null,
-            expiresAt: null,
-            grantedScopes: [],
-            configuration: {
-              ...additionalConfig,
-              orgSlug: organizationSlug,
-              projectIds: resolvedProjects.projectIds,
-              projectSlugs: resolvedProjects.projectSlugs,
-              projectNames: resolvedProjects.projectNames,
-              sentryBaseUrl,
-            },
-            logLevelThreshold: toLogLevelThreshold(payload.logLevelThreshold),
-            syncEnabled: payload.syncEnabled !== false,
-            autoDiagnosisEnabled: payload.autoDiagnosisEnabled === true,
-          })
-          log.info(
-            `[error-sources] create:success id=${created.id} name="${created.name}" org="${organizationSlug}"`,
-          )
-          return toRendererErrorSource(created)
-        } catch (error) {
-          log.error('[error-sources] create:failed', error)
-          throw error
-        }
-      }
-
-      if (!usePluginCreatePath && sourceType === 'posthog') {
-        if (authToken.length === 0) {
-          log.warn('[error-sources] create: missing authToken')
-          throw new Error('authToken is required')
-        }
-
-        const baseUrl = validatePostHogBaseUrl(
-          setupValues.baseUrl ??
-            payload.baseUrl ??
-            payload.posthogBaseUrl ??
-            persistedSetup.configuration.posthogBaseUrl,
-        )
-        const requestedProjectIds = firstNonEmptyStringArray([
-          () => readSetupStringArray(setupValues, 'projectIds'),
-          () => readSetupStringArray(setupValues, 'projectSlugs'),
-          () => readStringArray(persistedSetup.configuration.projectIds),
-          () => readStringArray(persistedSetup.configuration.projectSlugs),
-          () => firstNonEmptyStringArray([
-            () => readStringArray(payload.projectIds),
-            () => readStringArray(payload.projectSlugs),
-          ]),
-        ])
-        const requestedOrgId = readOptionalTrimmed(
-          setupValues.organizationId ??
-            setupValues.organizationSlug ??
-            persistedSetup.configuration.orgSlug ??
-            payload.organizationId ??
-            payload.organizationSlug,
-        )
-
-        log.info(
-          `[error-sources] create:start type=posthog name="${sourceName}" base="${baseUrl}" projects=${String(requestedProjectIds.length)}`,
-        )
-
-        try {
-          const provider = getPostHogProviderForBaseUrl(baseUrl, pluginId)
-          let organizationId = requestedOrgId
-          let organizationName: string | undefined
-          let projects: Awaited<ReturnType<typeof provider.listProjects>> | undefined
-          if (requestedProjectIds.length > 0) {
-            projects = await Promise.all(
-              requestedProjectIds.map((projectId) =>
-                provider.getProject({ accessToken: authToken, projectId }),
-              ),
-            )
-            const projectOrgIds = [
-              ...new Set(
-                projects
-                  .map((project) => project.organizationId)
-                  .filter((value): value is string => value !== undefined && value.length > 0),
-              ),
-            ]
-            if ((organizationId === undefined || organizationId.length === 0) && projectOrgIds.length === 1) {
-              organizationId = projectOrgIds[0]
-              organizationName = projectOrgIds[0]
-            }
-            if ((organizationId === undefined || organizationId.length === 0) && projectOrgIds.length > 1) {
-              throw new Error(
-                `Requested PostHog project id(s) span multiple organizations (${projectOrgIds.join(', ')}). Specify organizationId to disambiguate.`,
-              )
-            }
-            if (
-              organizationId !== undefined &&
-              organizationId.length > 0 &&
-              projectOrgIds.length > 0 &&
-              !projectOrgIds.includes(organizationId)
-            ) {
-              throw new Error(
-                `Requested PostHog project id(s) do not belong to organization ${organizationId}`,
-              )
-            }
-          }
-          if (organizationId === undefined || organizationId.length === 0) {
-            let organizations: Awaited<ReturnType<typeof provider.listOrganizations>>
-            try {
-              organizations = await provider.listOrganizations(authToken)
-            } catch (error) {
-              if (requestedProjectIds.length === 0 && isPostHogProjectScopedEndpointError(error)) {
-                throw new Error(POSTHOG_PROJECT_SCOPED_API_KEY_MESSAGE)
-              }
-              throw error
-            }
-            if (organizations.length === 0) {
-              throw new Error('No PostHog organizations are accessible with this API key')
-            }
-            // When the user supplied project ids and didn't pin an organization,
-            // we can't blindly pick organizations[0] - the requested projects
-            // may live in a different org and validation would later reject
-            // them as "Unknown PostHog project id(s)". Probe each org until we
-            // find the one that owns the requested projects (or detect the
-            // ambiguous case and ask the user to disambiguate).
-            if (requestedProjectIds.length > 0 && organizations.length > 1) {
-              const matches: Array<{
-                slug: string
-                name?: string
-                projects: Awaited<ReturnType<typeof provider.listProjects>>
-              }> = []
-              for (const org of organizations) {
-                const orgProjects = await provider.listProjects({
-                  accessToken: authToken,
-                  orgSlug: org.slug,
-                })
-                // Require every requested id be present in this org. A
-                // `some` check would mark an org as ambiguous when it owns
-                // any one of the requested ids, falsely rejecting valid
-                // requests where overlapping orgs share a subset but only
-                // one org actually has them all.
-                const orgIdSet = new Set(orgProjects.map((p) => p.id))
-                const ownsAll = requestedProjectIds.every((id) => orgIdSet.has(id))
-                if (ownsAll) {
-                  matches.push({ slug: org.slug, name: org.name, projects: orgProjects })
-                }
-              }
-              if (matches.length === 0) {
-                throw new Error(
-                  `Unknown PostHog project id(s): ${requestedProjectIds.join(', ')}`,
-                )
-              }
-              if (matches.length > 1) {
-                throw new Error(
-                  `Requested PostHog project id(s) match multiple organizations (${matches
-                    .map((m) => m.slug)
-                    .join(
-                      ', ',
-                    )}). Specify organizationId to disambiguate.`,
-                )
-              }
-              const match = matches[0]
-              organizationId = match.slug
-              organizationName = match.name
-              projects = match.projects
-            } else {
-              const first = organizations[0]
-              // Refuse to auto-pick when the API key can reach multiple
-              // organizations and the caller did not pin one. Picking
-              // organizations[0] silently binds the source to whichever
-              // workspace happens to come first in the response - a different
-              // tenant than the caller probably intended - and the mistake
-              // only surfaces later as syncs against the wrong data.
-              if (organizations.length > 1) {
-                throw new Error(
-                  `API key has access to multiple PostHog organizations (${organizations
-                    .map((org) => org.slug)
-                    .join(
-                      ', ',
-                    )}). Specify organizationId to disambiguate.`,
-                )
-              }
-              organizationId = first.slug
-              organizationName = first.name
-            }
-          }
-
-          if (projects === undefined) {
-            projects = await provider.listProjects({
-              accessToken: authToken,
-              orgSlug: organizationId,
-            })
-          }
-          if (projects.length === 0) {
-            throw new Error('No PostHog projects are accessible with this API key')
-          }
-
-          const projectsById = new Map(projects.map((project) => [project.id, project]))
-          const missingProjectIds: string[] = []
-          let resolvedProjectIds: string[]
-          let resolvedProjects: typeof projects
-          if (requestedProjectIds.length > 0) {
-            resolvedProjects = []
-            for (const projectId of requestedProjectIds) {
-              const project = projectsById.get(projectId)
-              if (project === undefined) {
-                missingProjectIds.push(projectId)
-                continue
-              }
-              resolvedProjects.push(project)
-            }
-            if (missingProjectIds.length > 0) {
-              throw new Error(
-                `Unknown PostHog project id(s): ${missingProjectIds.join(', ')}`,
-              )
-            }
-            resolvedProjectIds = resolvedProjects.map((project) => project.id)
-          } else {
-            resolvedProjects = projects
-            resolvedProjectIds = projects.map((project) => project.id)
-          }
-
-          const created = await sourcesRepository.create({
-            sourceType,
-            name: sourceName,
-            additionalMetadata: mergeErrorSourceAdditionalMetadata(
-              readPayloadRecord(payload.additionalMetadata),
-              pluginId,
-            ),
-            accessTokenRef: authToken,
-            refreshTokenRef: null,
-            expiresAt: null,
-            grantedScopes: [],
-            configuration: {
-              ...persistedSetup.configuration,
-              orgSlug: organizationId,
-              orgName: organizationName,
-              projectIds: resolvedProjectIds,
-              projectSlugs: resolvedProjectIds,
-              projectNames: resolvedProjects.map((project) => project.name),
-              posthogBaseUrl: baseUrl,
-            },
-            logLevelThreshold: toLogLevelThreshold(payload.logLevelThreshold),
-            syncEnabled: payload.syncEnabled !== false,
-            autoDiagnosisEnabled: payload.autoDiagnosisEnabled === true,
-          })
-          log.info(
-            `[error-sources] create:success id=${created.id} name="${created.name}" type=posthog`,
-          )
-          return toRendererErrorSource(created)
-        } catch (error) {
-          log.error('[error-sources] create:failed', error)
-          throw error
-        }
       }
 
       try {
