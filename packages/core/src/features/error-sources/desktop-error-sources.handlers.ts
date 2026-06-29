@@ -637,7 +637,7 @@ function buildPluginProbeAuth(input: {
     input.pluginRuntime,
     input.pluginId,
   )) {
-    if (field.storage === 'accessTokenRef' || field.target === 'authToken') {
+    if (field.storage === 'accessTokenRef') {
       auth[field.key] = input.authToken
     }
   }
@@ -812,7 +812,9 @@ export function createDesktopErrorSourcesHandlers(
   function useProjectSlugForProbe(pluginId: string): boolean {
     const fields =
       pluginRuntime.getPlugin(pluginId)?.metadata?.errorSource?.setupFields ?? []
-    return fields.some((field) => field.target === 'projectSlugs')
+    return fields.some(
+      (field) => (field.configurationKey ?? field.key) === 'projectSlugs',
+    )
   }
 
   return {

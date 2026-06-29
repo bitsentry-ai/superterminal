@@ -159,20 +159,6 @@ export type DesktopPluginErrorSourceType = z.infer<
   typeof desktopPluginErrorSourceTypeSchema
 >;
 
-export const desktopPluginErrorSourceSetupFieldTargetSchema = z.enum([
-  "authToken",
-  "organizationSlug",
-  "organizationId",
-  "projectSlugs",
-  "projectIds",
-  "baseUrl",
-  "indexPatterns",
-]);
-
-export type DesktopPluginErrorSourceSetupFieldTarget = z.infer<
-  typeof desktopPluginErrorSourceSetupFieldTargetSchema
->;
-
 export const desktopPluginErrorSourceSetupFieldControlSchema = z.enum([
   "text",
   "password",
@@ -195,7 +181,6 @@ export type DesktopPluginErrorSourceSetupFieldStorage = z.infer<
 export const desktopPluginErrorSourceSetupFieldSchema = z
   .object({
     key: z.string().min(1),
-    target: desktopPluginErrorSourceSetupFieldTargetSchema.optional(),
     storage: desktopPluginErrorSourceSetupFieldStorageSchema.default(
       "configuration",
     ),

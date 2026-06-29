@@ -614,15 +614,6 @@ export interface PluginErrorSourceMetadata {
   };
 }
 
-export type PluginErrorSourceSetupFieldTarget =
-  | "authToken"
-  | "organizationSlug"
-  | "organizationId"
-  | "projectSlugs"
-  | "projectIds"
-  | "baseUrl"
-  | "indexPatterns";
-
 export type PluginErrorSourceSetupFieldControl =
   | "text"
   | "password"
@@ -634,7 +625,6 @@ export type PluginErrorSourceSetupFieldStorage =
 
 export interface PluginErrorSourceSetupField {
   key: string;
-  target?: PluginErrorSourceSetupFieldTarget;
   storage: PluginErrorSourceSetupFieldStorage;
   configurationKey?: string;
   label: string;

@@ -245,7 +245,7 @@ function setupFieldDescription(
 function editSetupFieldPlaceholder(
   field: PluginErrorSourceSetupField,
 ): string {
-  if (field.target === "authToken" || field.storage === "accessTokenRef") {
+  if (field.storage === "accessTokenRef") {
     return "Leave blank to keep the current token.";
   }
 
@@ -253,12 +253,7 @@ function editSetupFieldPlaceholder(
 }
 
 function isListSetupField(field: PluginErrorSourceSetupField): boolean {
-  return (
-    field.control === "multiline_list" ||
-    field.target === "projectSlugs" ||
-    field.target === "projectIds" ||
-    field.target === "indexPatterns"
-  );
+  return field.control === "multiline_list";
 }
 
 function readArrayDisplayValue(value: unknown): string {
@@ -280,33 +275,21 @@ function readPluginSetupFieldDisplayValue(
 
   const key = field.configurationKey ?? field.key;
 
-  switch (field.target) {
-    case "organizationSlug":
-    case "organizationId":
-      return readStringFromConfig(config, key);
-    case "projectSlugs":
-    case "projectIds":
-      return readStringArrayFromConfig(config, key);
-    case "baseUrl":
-      return readStringFromConfig(config, key);
-    case "indexPatterns":
-      return readStringArrayFromConfig(config, key);
-    case "authToken":
-      return "";
-    default: {
-      const value = config[key];
-      if (typeof value === "string") {
-        return value;
-      }
-      if (Array.isArray(value)) {
-        return readArrayDisplayValue(value);
-      }
-      if (value !== null && typeof value === "object") {
-        return JSON.stringify(value);
-      }
-      return "";
-    }
+  if (field.storage === "accessTokenRef") {
+    return "";
   }
+
+  const value = config[key];
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return readArrayDisplayValue(value);
+  }
+  if (value !== null && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return "";
 }
 
 function buildInitialEditSetupFieldValues(
@@ -383,17 +366,9 @@ export default function ErrorSourcesManager({
   const [sourceType, setSourceType] = useState<ErrorSourceType>("");
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [sourceName, setSourceName] = useState("");
-  const [authToken, setAuthToken] = useState("");
 
-  const [baseUrlInput, setBaseUrlInput] = useState("");
-  const [indexPatternsText, setIndexPatternsText] = useState("");
-
-  // Manual org/project entry. A probe-then-pick flow used to live here but
-  // the picker UI was never wired up to a button, so callers always typed
-  // org/project ids directly. The names retain the `advanced*` prefix
-  // because they bind to the same inputs the user already sees.
-  const [advancedOrgInput, setAdvancedOrgInput] = useState("");
-  const [advancedProjectsInput, setAdvancedProjectsInput] = useState("");
+  // Code plugins define their own setup fields. Keep values keyed by plugin
+  // field id so the UI does not need provider-specific branches.
   const [customSetupFieldValues, setCustomSetupFieldValues] = useState<
     Record<string, string>
   >({});
@@ -555,11 +530,6 @@ export default function ErrorSourcesManager({
   }, [providerCards, selectedProviderCard, selectedProviderId, sourceType]);
 
   function resetCreateDialog() {
-    setAuthToken("");
-    setIndexPatternsText("");
-    setBaseUrlInput("");
-    setAdvancedOrgInput("");
-    setAdvancedProjectsInput("");
     setCustomSetupFieldValues({});
     setDialogError(null);
     setShowAdvanced(false);
@@ -570,83 +540,29 @@ export default function ErrorSourcesManager({
   function readSetupFieldTextValue(
     field: PluginErrorSourceSetupField,
   ): string {
-    switch (field.target) {
-      case "authToken":
-        return authToken.trim();
-      case "organizationSlug":
-      case "organizationId":
-        return advancedOrgInput.trim();
-      case "baseUrl":
-        return baseUrlInput.trim();
-      default:
-        return customSetupFieldValues[field.key]?.trim() ?? "";
-    }
+    return customSetupFieldValues[field.key]?.trim() ?? "";
   }
 
   function readSetupFieldListValue(
     field: PluginErrorSourceSetupField,
   ): string[] {
-    switch (field.target) {
-      case "projectSlugs":
-      case "projectIds":
-        return toProjectSlugs(advancedProjectsInput);
-      case "indexPatterns":
-        return toProjectSlugs(indexPatternsText);
-      default:
-        return toProjectSlugs(customSetupFieldValues[field.key] ?? "");
-    }
+    return toProjectSlugs(customSetupFieldValues[field.key] ?? "");
   }
 
   function readSetupFieldInputValue(
     field: PluginErrorSourceSetupField,
   ): string {
-    switch (field.target) {
-      case "authToken":
-        return authToken;
-      case "organizationSlug":
-      case "organizationId":
-        return advancedOrgInput;
-      case "projectSlugs":
-      case "projectIds":
-        return advancedProjectsInput;
-      case "baseUrl":
-        return baseUrlInput;
-      case "indexPatterns":
-        return indexPatternsText;
-      default:
-        return customSetupFieldValues[field.key] ?? "";
-    }
+    return customSetupFieldValues[field.key] ?? "";
   }
 
   function setSetupFieldInputValue(
     field: PluginErrorSourceSetupField,
     nextValue: string,
   ): void {
-    switch (field.target) {
-      case "authToken":
-        setAuthToken(nextValue);
-        break;
-      case "organizationSlug":
-      case "organizationId":
-        setAdvancedOrgInput(nextValue);
-        break;
-      case "projectSlugs":
-      case "projectIds":
-        setAdvancedProjectsInput(nextValue);
-        break;
-      case "baseUrl":
-        setBaseUrlInput(nextValue);
-        break;
-      case "indexPatterns":
-        setIndexPatternsText(nextValue);
-        break;
-      default:
-        setCustomSetupFieldValues((current) => ({
-          ...current,
-          [field.key]: nextValue,
-        }));
-        break;
-    }
+    setCustomSetupFieldValues((current) => ({
+      ...current,
+      [field.key]: nextValue,
+    }));
   }
 
   function readCreateSourceValidationError(
@@ -696,72 +612,20 @@ export default function ErrorSourcesManager({
     for (const field of selectedSetupFields) {
       if (isListSetupField(field)) {
         setupValues[field.key] = readSetupFieldListValue(field);
-      } else {
-        const value = readSetupFieldTextValue(field);
-        if (value.length > 0) {
-          setupValues[field.key] = value;
-        }
+        continue;
       }
 
-      switch (field.target) {
-        case "authToken": {
-          const value = readSetupFieldTextValue(field);
-          if (value.length > 0) {
-            setupValues.authToken = value;
-            input.authToken = value;
-          }
-          break;
-        }
-        case "organizationSlug": {
-          const value = readSetupFieldTextValue(field);
-          if (value.length > 0) {
-            setupValues.organizationSlug = value;
-            input.organizationSlug = value;
-          }
-          break;
-        }
-        case "organizationId": {
-          const value = readSetupFieldTextValue(field);
-          if (value.length > 0) {
-            setupValues.organizationId = value;
-            input.organizationId = value;
-          }
-          break;
-        }
-        case "projectSlugs": {
-          const value = readSetupFieldListValue(field);
-          setupValues.projectSlugs = value;
-          input.projectSlugs = value;
-          break;
-        }
-        case "projectIds": {
-          const value = readSetupFieldListValue(field);
-          setupValues.projectIds = value;
-          input.projectIds = value;
-          break;
-        }
-        case "indexPatterns": {
-          const value = readSetupFieldListValue(field);
-          setupValues.indexPatterns = value;
-          input.indexPatterns = value;
-          break;
-        }
-        case "baseUrl": {
-          const value = readSetupFieldTextValue(field);
-          if (value.length > 0) {
-            input.baseUrl = value;
-          }
-          break;
-        }
-        default:
-          break;
+      const value = readSetupFieldTextValue(field);
+      if (value.length > 0) {
+        setupValues[field.key] = value;
       }
     }
 
     return input;
   }
 
-  // Submit — uses the typed org/project ids.
+  // Submit the plugin-defined setup values without translating through a
+  // built-in provider field vocabulary.
   const createSource = async () => {
     const trimmedName = sourceName.trim();
     const validationError = readCreateSourceValidationError(trimmedName);
@@ -852,7 +716,7 @@ export default function ErrorSourcesManager({
         continue;
       }
 
-      if (field.target === "authToken" || field.storage === "accessTokenRef") {
+      if (field.storage === "accessTokenRef") {
         continue;
       }
 
@@ -891,19 +755,6 @@ export default function ErrorSourcesManager({
           continue;
         }
         setupValues[field.key] = value;
-        switch (field.target) {
-          case "projectSlugs":
-            setupValues.projectSlugs = value;
-            break;
-          case "projectIds":
-            setupValues.projectIds = value;
-            break;
-          case "indexPatterns":
-            setupValues.indexPatterns = value;
-            break;
-          default:
-            break;
-        }
         continue;
       }
 
@@ -913,22 +764,6 @@ export default function ErrorSourcesManager({
       }
 
       setupValues[field.key] = value;
-      switch (field.target) {
-        case "authToken":
-          setupValues.authToken = value;
-          break;
-        case "organizationSlug":
-          setupValues.organizationSlug = value;
-          break;
-        case "organizationId":
-          setupValues.organizationId = value;
-          break;
-        case "baseUrl":
-          setupValues.baseUrl = value;
-          break;
-        default:
-          break;
-      }
     }
 
     try {
@@ -1300,16 +1135,9 @@ export default function ErrorSourcesManager({
                       onClick={() => {
                         setSelectedProviderId(card.pluginId);
                         setSourceType(card.sourceType);
-                        // Each provider has its own credential format
-                        // (Sentry tokens are not PostHog tokens; org slugs
-                        // are not numeric ids), so clear everything on
-                        // switch instead of carrying garbage across.
+                        // Each code plugin owns its setup shape, so clear
+                        // field values when switching providers.
                         setSourceName("");
-                        setAuthToken("");
-                        setBaseUrlInput("");
-                        setIndexPatternsText("");
-                        setAdvancedOrgInput("");
-                        setAdvancedProjectsInput("");
                         setCustomSetupFieldValues({});
                         setDialogError(null);
                       }}
@@ -1593,26 +1421,6 @@ export default function ErrorSourcesManager({
       </Dialog>
     </div>
   );
-}
-
-function readStringFromConfig(
-  config: Record<string, unknown> | undefined,
-  key: string,
-): string {
-  if (config === undefined) return "";
-  const value = config[key];
-  if (typeof value === "string") return value;
-  return "";
-}
-
-function readStringArrayFromConfig(
-  config: Record<string, unknown> | undefined,
-  key: string,
-): string {
-  if (config === undefined) return "";
-  const value = config[key];
-  if (!Array.isArray(value)) return "";
-  return value.filter((v): v is string => typeof v === "string").join(", ");
 }
 
 function renderEditConnectionFields(input: {

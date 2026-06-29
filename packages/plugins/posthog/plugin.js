@@ -1127,7 +1127,6 @@ exports.plugin = {
       setupFields: [
         {
           key: "authToken",
-          target: "authToken",
           storage: "accessTokenRef",
           label: "PostHog personal API key",
           required: true,
@@ -1135,7 +1134,6 @@ exports.plugin = {
         },
         {
           key: "baseUrl",
-          target: "baseUrl",
           storage: "configuration",
           configurationKey: "posthogBaseUrl",
           label: "PostHog base URL",
@@ -1145,7 +1143,6 @@ exports.plugin = {
         },
         {
           key: "organizationId",
-          target: "organizationId",
           storage: "configuration",
           configurationKey: "orgSlug",
           label: "Organization ID",
@@ -1154,7 +1151,6 @@ exports.plugin = {
         },
         {
           key: "projectIds",
-          target: "projectIds",
           storage: "configuration",
           configurationKey: "projectIds",
           label: "Project IDs",

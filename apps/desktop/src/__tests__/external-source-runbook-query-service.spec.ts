@@ -86,7 +86,6 @@ function createWazuhDescriptor(): DesktopPluginDescriptor {
         setupFields: [
           {
             key: 'indexUrl',
-            target: 'baseUrl',
             storage: 'configuration',
             configurationKey: 'baseUrl',
             label: 'Wazuh index URL',
@@ -95,7 +94,6 @@ function createWazuhDescriptor(): DesktopPluginDescriptor {
           },
           {
             key: 'indexPassword',
-            target: 'authToken',
             storage: 'accessTokenRef',
             label: 'Wazuh index password',
             required: true,
@@ -103,7 +101,6 @@ function createWazuhDescriptor(): DesktopPluginDescriptor {
           },
           {
             key: 'indexPatterns',
-            target: 'indexPatterns',
             storage: 'configuration',
             configurationKey: 'indexPatterns',
             label: 'Index patterns',
@@ -136,7 +133,6 @@ function createSentryDescriptor(): DesktopPluginDescriptor {
         setupFields: [
           {
             key: 'authToken',
-            target: 'authToken',
             storage: 'accessTokenRef',
             label: 'Sentry auth token',
             required: true,
@@ -144,7 +140,6 @@ function createSentryDescriptor(): DesktopPluginDescriptor {
           },
           {
             key: 'organizationSlug',
-            target: 'organizationSlug',
             storage: 'configuration',
             configurationKey: 'orgSlug',
             label: 'Organization slug',
@@ -153,7 +148,6 @@ function createSentryDescriptor(): DesktopPluginDescriptor {
           },
           {
             key: 'projectSlugs',
-            target: 'projectSlugs',
             storage: 'configuration',
             configurationKey: 'projectSlugs',
             label: 'Project slugs',

@@ -373,7 +373,6 @@ exports.plugin = {
       setupFields: [
         {
           key: "indexUrl",
-          target: "baseUrl",
           storage: "configuration",
           configurationKey: "baseUrl",
           label: "Wazuh index URL",
@@ -384,7 +383,6 @@ exports.plugin = {
         },
         {
           key: "indexPassword",
-          target: "authToken",
           storage: "accessTokenRef",
           label: "Wazuh index password",
           description:
@@ -394,7 +392,6 @@ exports.plugin = {
         },
         {
           key: "indexPatterns",
-          target: "indexPatterns",
           storage: "configuration",
           configurationKey: "indexPatterns",
           label: "Index patterns",

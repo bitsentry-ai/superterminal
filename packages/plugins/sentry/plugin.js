@@ -492,7 +492,6 @@ exports.plugin = {
       setupFields: [
         {
           key: "authToken",
-          target: "authToken",
           storage: "accessTokenRef",
           label: "Sentry auth token",
           description: "User auth token or OAuth access token for Sentry.",
@@ -501,7 +500,6 @@ exports.plugin = {
         },
         {
           key: "organizationSlug",
-          target: "organizationSlug",
           storage: "configuration",
           configurationKey: "orgSlug",
           label: "Organization slug",
@@ -511,7 +509,6 @@ exports.plugin = {
         },
         {
           key: "projectSlugs",
-          target: "projectSlugs",
           storage: "configuration",
           configurationKey: "projectSlugs",
           label: "Project slugs",
