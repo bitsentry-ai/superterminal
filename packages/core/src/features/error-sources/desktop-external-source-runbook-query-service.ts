@@ -11,7 +11,7 @@ import {
 import type {
   DesktopPluginRuntimeService,
 } from "../plugins/desktop-plugin-registry";
-import type { DesktopPluginErrorSourceSetupField } from "../plugins/plugins.types";
+import type { DesktopPluginErrorSourceRecord } from "../plugins/plugins.types";
 import {
   hasErrorSourceProviderAction,
   resolveErrorSourceProviderActionId,
@@ -109,45 +109,28 @@ function readPluginOutput(data: unknown): string {
   throw new Error("External Source code plugin returned no output");
 }
 
-function readPluginErrorSourceSetupFields(
-  pluginRuntime: DesktopPluginRuntimeService,
-  pluginId: string,
-): DesktopPluginErrorSourceSetupField[] {
-  return (
-    pluginRuntime.getPlugin(pluginId)?.metadata?.errorSource?.setupFields ?? []
-  );
+function pluginSourceRecord(source: ErrorSource): DesktopPluginErrorSourceRecord {
+  return {
+    id: source.id,
+    sourceType: source.sourceType,
+    name: source.name,
+    accessTokenRef: source.accessTokenRef,
+    refreshTokenRef: source.refreshTokenRef,
+    expiresAt: source.expiresAt,
+    grantedScopes: source.grantedScopes,
+    configuration: { ...source.configuration },
+  };
 }
 
 function buildPluginAuthFromSource(
   source: ErrorSource,
   pluginRuntime: DesktopPluginRuntimeService,
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const pluginId = readSourcePluginId(source);
-  const auth: Record<string, unknown> = {};
-  const accessToken = source.accessTokenRef?.trim();
-
-  for (const field of readPluginErrorSourceSetupFields(pluginRuntime, pluginId)) {
-    if (field.storage === "accessTokenRef") {
-      if (accessToken !== undefined && accessToken.length > 0) {
-        auth[field.key] = accessToken;
-        auth.accessToken = accessToken;
-      }
-      continue;
-    }
-
-    const configurationKey = field.configurationKey ?? field.key;
-    const value = (source.configuration as Record<string, unknown>)[configurationKey];
-    if (value === undefined) {
-      continue;
-    }
-
-    auth[field.key] = value;
-    if (configurationKey !== field.key) {
-      auth[configurationKey] = value;
-    }
-  }
-
-  return auth;
+  return pluginRuntime.buildErrorSourceAuth({
+    pluginId,
+    source: pluginSourceRecord(source),
+  });
 }
 
 function buildGenericPluginQueryInput(
@@ -322,7 +305,7 @@ function formatGenericPluginQueryResults(input: {
   return lines.join("\n");
 }
 
-function executeCustomPluginQuery(args: {
+async function executeCustomPluginQuery(args: {
   source: ErrorSource;
   query: string;
   limit: number;
@@ -342,7 +325,7 @@ function executeCustomPluginQuery(args: {
     );
   }
 
-  const auth = buildPluginAuthFromSource(source, pluginRuntime);
+  const auth = await buildPluginAuthFromSource(source, pluginRuntime);
   const input = buildGenericPluginQueryInput(source, query, limit);
 
   if (hasErrorSourceProviderAction(plugin, "queryIssues")) {

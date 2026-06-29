@@ -7,10 +7,16 @@ import type {
   DesktopPluginExecutionResult,
   DesktopPluginFieldDefinition,
   DesktopPluginDescriptor,
+  DesktopPluginPersistedErrorSourceSetup,
+  DesktopPluginErrorSourceRecord,
+  DesktopCodePluginErrorSource,
   DesktopPluginInstallFromArchiveRequest,
   DesktopPluginInstallFromArchiveResult,
+  DesktopPluginCodeHostContext,
 } from "./plugins.types";
 import {
+  desktopPluginPersistedErrorSourceSetupSchema,
+  desktopPluginErrorSourceRecordSchema,
   desktopPluginExecutionRequestSchema,
   desktopPluginExecutionResultSchema,
   desktopPluginDescriptorSchema,
@@ -34,6 +40,8 @@ type PluginActionRuntime = {
 type PluginRuntime = {
   descriptor: DesktopPluginDescriptor;
   actions: Map<string, PluginActionRuntime>;
+  errorSource?: DesktopCodePluginErrorSource;
+  host: DesktopPluginCodeHostContext;
 };
 
 type LoadedPluginRuntimeContext = {
@@ -98,6 +106,19 @@ export function buildPluginInputSchema(
   return z.looseObject(shape);
 }
 
+function createPluginHostContext(
+  context: LoadedPluginRuntimeContext,
+): DesktopPluginCodeHostContext {
+  return {
+    pluginRoot: context.loadedPlugin.pluginRoot,
+    entryPath: context.loadedPlugin.entryPath,
+    localPluginDirectories: context.localPluginDirectories,
+    installPluginFromArchive: (archiveInput) =>
+      context.installPluginFromArchive(archiveInput),
+    reloadPlugins: () => context.reloadPlugins(),
+  };
+}
+
 function createActionRuntime(
   pluginId: string,
   action: DesktopCodePluginAction,
@@ -120,14 +141,7 @@ function createActionRuntime(
         actionId: action.id,
         auth: request.auth,
         input: validatedInput,
-        host: {
-          pluginRoot: context.loadedPlugin.pluginRoot,
-          entryPath: context.loadedPlugin.entryPath,
-          localPluginDirectories: context.localPluginDirectories,
-          installPluginFromArchive: (archiveInput) =>
-            context.installPluginFromArchive(archiveInput),
-          reloadPlugins: () => context.reloadPlugins(),
-        },
+        host: createPluginHostContext(context),
       });
 
       return desktopPluginExecutionResultSchema.parse({
@@ -177,7 +191,63 @@ function createPluginRuntime(
   return {
     descriptor,
     actions: new Map(actions.map((action) => [action.id, action])),
+    errorSource: plugin.errorSource,
+    host: createPluginHostContext(runtimeContext),
   };
+}
+
+function normalizeOptionalRecord(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function defaultResolveErrorSourceSetup(
+  setupValues: Record<string, unknown>,
+): DesktopPluginPersistedErrorSourceSetup {
+  return {
+    configuration: { ...setupValues },
+  };
+}
+
+function defaultBuildErrorSourceAuth(
+  source: DesktopPluginErrorSourceRecord,
+): Record<string, unknown> {
+  const auth: Record<string, unknown> = {
+    ...normalizeOptionalRecord(source.configuration),
+  };
+  const accessToken = source.accessTokenRef?.trim();
+  if (accessToken !== undefined && accessToken.length > 0) {
+    auth.accessToken = accessToken;
+    auth.authToken ??= accessToken;
+  }
+  const refreshToken = source.refreshTokenRef?.trim();
+  if (refreshToken !== undefined && refreshToken.length > 0) {
+    auth.refreshToken = refreshToken;
+  }
+  if (source.expiresAt !== null && source.expiresAt !== undefined) {
+    auth.expiresAt = source.expiresAt;
+  }
+  if (source.grantedScopes !== undefined && source.grantedScopes.length > 0) {
+    auth.grantedScopes = source.grantedScopes;
+  }
+
+  return auth;
+}
+
+function defaultBuildErrorSourceProbeAuth(
+  persistedSetup: DesktopPluginPersistedErrorSourceSetup,
+): Record<string, unknown> {
+  return defaultBuildErrorSourceAuth({
+    sourceType: "plugin",
+    accessTokenRef: persistedSetup.accessTokenRef,
+    refreshTokenRef: persistedSetup.refreshTokenRef,
+    expiresAt: persistedSetup.expiresAt,
+    grantedScopes: persistedSetup.grantedScopes,
+    configuration: persistedSetup.configuration,
+  });
 }
 
 export class DesktopPluginRegistry {
@@ -217,6 +287,14 @@ export class DesktopPluginRegistry {
   getAction(pluginId: string, actionId: string): PluginActionRuntime | null {
     return this.plugins.get(pluginId)?.actions.get(actionId) ?? null;
   }
+
+  getErrorSource(pluginId: string): DesktopCodePluginErrorSource | null {
+    return this.plugins.get(pluginId)?.errorSource ?? null;
+  }
+
+  getPluginHost(pluginId: string): DesktopPluginCodeHostContext | null {
+    return this.plugins.get(pluginId)?.host ?? null;
+  }
 }
 
 export class DesktopPluginRuntimeService {
@@ -228,6 +306,79 @@ export class DesktopPluginRuntimeService {
 
   getPlugin(pluginId: string): DesktopPluginDescriptor | null {
     return this.registry.get(pluginId);
+  }
+
+  async resolveErrorSourceSetup(input: {
+    pluginId: string;
+    setupValues: Record<string, unknown>;
+  }): Promise<DesktopPluginPersistedErrorSourceSetup> {
+    const errorSource = this.registry.getErrorSource(input.pluginId);
+    let resolved: DesktopPluginPersistedErrorSourceSetup;
+    if (errorSource?.resolveSetup === undefined) {
+      resolved = defaultResolveErrorSourceSetup(input.setupValues);
+    } else {
+      const host = this.registry.getPluginHost(input.pluginId);
+      if (host === null) {
+        throw new Error(`Unknown plugin: ${input.pluginId}`);
+      }
+      resolved = await errorSource.resolveSetup({
+        pluginId: input.pluginId,
+        setupValues: input.setupValues,
+        host,
+      });
+    }
+
+    return desktopPluginPersistedErrorSourceSetupSchema.parse(resolved);
+  }
+
+  async buildErrorSourceAuth(input: {
+    pluginId: string;
+    source: DesktopPluginErrorSourceRecord;
+  }): Promise<Record<string, unknown>> {
+    const source = desktopPluginErrorSourceRecordSchema.parse(input.source);
+    const errorSource = this.registry.getErrorSource(input.pluginId);
+    if (errorSource?.buildAuth === undefined) {
+      return defaultBuildErrorSourceAuth(source);
+    }
+
+    const host = this.registry.getPluginHost(input.pluginId);
+    if (host === null) {
+      throw new Error(`Unknown plugin: ${input.pluginId}`);
+    }
+
+    return errorSource.buildAuth({
+      pluginId: input.pluginId,
+      source,
+      host,
+    });
+  }
+
+  async buildErrorSourceProbeAuth(input: {
+    pluginId: string;
+    persistedSetup: DesktopPluginPersistedErrorSourceSetup;
+  }): Promise<Record<string, unknown>> {
+    const persistedSetup = desktopPluginPersistedErrorSourceSetupSchema.parse(
+      input.persistedSetup,
+    );
+    const errorSource = this.registry.getErrorSource(input.pluginId);
+    if (errorSource?.buildProbeAuth === undefined) {
+      return defaultBuildErrorSourceProbeAuth(persistedSetup);
+    }
+
+    const host = this.registry.getPluginHost(input.pluginId);
+    if (host === null) {
+      throw new Error(`Unknown plugin: ${input.pluginId}`);
+    }
+
+    return errorSource.buildProbeAuth({
+      pluginId: input.pluginId,
+      persistedSetup,
+      host,
+    });
+  }
+
+  getErrorSourceProbeProjectIdentity(pluginId: string): "id" | "slug" {
+    return this.registry.getErrorSource(pluginId)?.probeProjectIdentity ?? "id";
   }
 
   installFromArchive(

@@ -25,7 +25,6 @@ export interface ErrorSourceConfiguration {
   projectNames?: string[];
   baseUrl?: string;
   indexPatterns?: string[];
-  sentryBaseUrl?: string;
   oauthClientId?: string;
   oauthClientSecret?: string;
   oauthRedirectUri?: string;

@@ -169,41 +169,14 @@ export type DesktopPluginErrorSourceSetupFieldControl = z.infer<
   typeof desktopPluginErrorSourceSetupFieldControlSchema
 >;
 
-export const desktopPluginErrorSourceSetupFieldStorageSchema = z.enum([
-  "accessTokenRef",
-  "configuration",
-]);
-
-export type DesktopPluginErrorSourceSetupFieldStorage = z.infer<
-  typeof desktopPluginErrorSourceSetupFieldStorageSchema
->;
-
-export const desktopPluginErrorSourceSetupFieldSchema = z
-  .object({
-    key: z.string().min(1),
-    storage: desktopPluginErrorSourceSetupFieldStorageSchema.default(
-      "configuration",
-    ),
-    configurationKey: z.string().min(1).optional(),
-    label: z.string().min(1),
-    placeholder: z.string().min(1).optional(),
-    description: z.string().min(1).optional(),
-    required: z.boolean().default(false),
-    control: desktopPluginErrorSourceSetupFieldControlSchema.default("text"),
-  })
-  .superRefine((field, context) => {
-    if (
-      field.storage === "accessTokenRef" &&
-      field.configurationKey !== undefined
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["configurationKey"],
-        message:
-          "configurationKey is only valid for configuration-backed setup fields.",
-      });
-    }
-  });
+export const desktopPluginErrorSourceSetupFieldSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  placeholder: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  required: z.boolean().default(false),
+  control: desktopPluginErrorSourceSetupFieldControlSchema.default("text"),
+});
 
 export type DesktopPluginErrorSourceSetupField = z.infer<
   typeof desktopPluginErrorSourceSetupFieldSchema
@@ -300,21 +273,23 @@ export type DesktopPluginInstallResult = {
   extractedEntryPath: string;
 };
 
+export type DesktopPluginCodeHostContext = {
+  pluginRoot: string;
+  entryPath: string;
+  localPluginDirectories: string[];
+  installPluginFromArchive(input: {
+    archive: Uint8Array;
+    installRoot?: string;
+  }): Promise<DesktopPluginInstallResult>;
+  reloadPlugins(): Promise<void>;
+};
+
 export type DesktopPluginCodeActionContext = {
   pluginId: string;
   actionId: string;
   auth: Record<string, unknown>;
   input: Record<string, unknown>;
-  host: {
-    pluginRoot: string;
-    entryPath: string;
-    localPluginDirectories: string[];
-    installPluginFromArchive(input: {
-      archive: Uint8Array;
-      installRoot?: string;
-    }): Promise<DesktopPluginInstallResult>;
-    reloadPlugins(): Promise<void>;
-  };
+  host: DesktopPluginCodeHostContext;
 };
 
 export type DesktopPluginCodeActionHandlerResult = {
@@ -329,6 +304,91 @@ export type DesktopPluginCodeActionHandler = (
 ) =>
   | DesktopPluginCodeActionHandlerResult
   | Promise<DesktopPluginCodeActionHandlerResult>;
+
+export const desktopPluginPersistedErrorSourceSetupSchema = z.object({
+  accessTokenRef: z.string().optional(),
+  refreshTokenRef: z.string().optional(),
+  expiresAt: z.string().nullable().optional(),
+  grantedScopes: z.array(z.string()).optional(),
+  configuration: z.record(z.string(), z.unknown()).default({}),
+});
+
+export type DesktopPluginPersistedErrorSourceSetup = z.infer<
+  typeof desktopPluginPersistedErrorSourceSetupSchema
+>;
+
+export const desktopPluginErrorSourceRecordSchema = z.object({
+  id: z.string().optional(),
+  sourceType: z.string().min(1),
+  name: z.string().optional(),
+  accessTokenRef: z.string().nullable().optional(),
+  refreshTokenRef: z.string().nullable().optional(),
+  expiresAt: z.string().nullable().optional(),
+  grantedScopes: z.array(z.string()).optional(),
+  configuration: z.record(z.string(), z.unknown()).default({}),
+});
+
+export type DesktopPluginErrorSourceRecord = z.infer<
+  typeof desktopPluginErrorSourceRecordSchema
+>;
+
+export type DesktopPluginResolveErrorSourceSetupContext = {
+  pluginId: string;
+  setupValues: Record<string, unknown>;
+  host: DesktopPluginCodeHostContext;
+};
+
+export type DesktopPluginBuildErrorSourceAuthContext = {
+  pluginId: string;
+  source: DesktopPluginErrorSourceRecord;
+  host: DesktopPluginCodeHostContext;
+};
+
+export type DesktopPluginBuildErrorSourceProbeAuthContext = {
+  pluginId: string;
+  persistedSetup: DesktopPluginPersistedErrorSourceSetup;
+  host: DesktopPluginCodeHostContext;
+};
+
+export type DesktopPluginResolveErrorSourceSetupHandler = (
+  context: DesktopPluginResolveErrorSourceSetupContext,
+) =>
+  | DesktopPluginPersistedErrorSourceSetup
+  | Promise<DesktopPluginPersistedErrorSourceSetup>;
+
+export type DesktopPluginBuildErrorSourceAuthHandler = (
+  context: DesktopPluginBuildErrorSourceAuthContext,
+) => Record<string, unknown> | Promise<Record<string, unknown>>;
+
+export type DesktopPluginBuildErrorSourceProbeAuthHandler = (
+  context: DesktopPluginBuildErrorSourceProbeAuthContext,
+) => Record<string, unknown> | Promise<Record<string, unknown>>;
+
+export const desktopCodePluginErrorSourceSchema = z.object({
+  resolveSetup: z
+    .custom<DesktopPluginResolveErrorSourceSetupHandler>(
+      (value) => typeof value === "function",
+      "resolveSetup must be a function.",
+    )
+    .optional(),
+  buildAuth: z
+    .custom<DesktopPluginBuildErrorSourceAuthHandler>(
+      (value) => typeof value === "function",
+      "buildAuth must be a function.",
+    )
+    .optional(),
+  buildProbeAuth: z
+    .custom<DesktopPluginBuildErrorSourceProbeAuthHandler>(
+      (value) => typeof value === "function",
+      "buildProbeAuth must be a function.",
+    )
+    .optional(),
+  probeProjectIdentity: z.enum(["id", "slug"]).optional(),
+});
+
+export type DesktopCodePluginErrorSource = z.infer<
+  typeof desktopCodePluginErrorSourceSchema
+>;
 
 export const desktopCodePluginActionSchema = desktopPluginActionDefinitionSchema.extend({
   execute: z.custom<DesktopPluginCodeActionHandler>(
@@ -347,6 +407,7 @@ export const desktopCodePluginSchema = desktopPluginDescriptorSchema
   .extend({
     actions: z.array(desktopCodePluginActionSchema),
     triggers: z.array(desktopPluginTriggerDefinitionSchema).default([]),
+    errorSource: desktopCodePluginErrorSourceSchema.optional(),
   });
 
 export type DesktopCodePlugin = z.infer<typeof desktopCodePluginSchema>;

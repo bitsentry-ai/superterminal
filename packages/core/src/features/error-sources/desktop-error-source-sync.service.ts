@@ -23,9 +23,9 @@ import {
   createDesktopNodePluginRuntimeService,
 } from '../plugins/node'
 import type {
+  DesktopPluginErrorSourceRecord,
   DesktopPluginRuntimeService,
 } from '../plugins'
-import type { DesktopPluginErrorSourceSetupField } from '../plugins/plugins.types'
 import {
   hasErrorSourceProviderAction,
   resolveErrorSourceProviderActionId,
@@ -313,43 +313,28 @@ function readSourcePluginId(source: ErrorSource): string {
   return source.sourceType
 }
 
-function readPluginErrorSourceSetupFields(
-  pluginRuntime: DesktopPluginRuntimeService,
-  pluginId: string,
-): DesktopPluginErrorSourceSetupField[] {
-  return pluginRuntime.getPlugin(pluginId)?.metadata?.errorSource?.setupFields ?? []
+function pluginSourceRecord(source: ErrorSource): DesktopPluginErrorSourceRecord {
+  return {
+    id: source.id,
+    sourceType: source.sourceType,
+    name: source.name,
+    accessTokenRef: source.accessTokenRef,
+    refreshTokenRef: source.refreshTokenRef,
+    expiresAt: source.expiresAt,
+    grantedScopes: source.grantedScopes,
+    configuration: { ...source.configuration },
+  }
 }
 
 function buildPluginAuthFromSource(
   source: ErrorSource,
   pluginRuntime: DesktopPluginRuntimeService,
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const pluginId = readSourcePluginId(source)
-  const auth: Record<string, unknown> = {}
-  const accessToken = source.accessTokenRef?.trim()
-
-  for (const field of readPluginErrorSourceSetupFields(pluginRuntime, pluginId)) {
-    if (field.storage === 'accessTokenRef') {
-      if (accessToken !== undefined && accessToken.length > 0) {
-        auth[field.key] = accessToken
-        auth.accessToken = accessToken
-      }
-      continue
-    }
-
-    const configurationKey = field.configurationKey ?? field.key
-    const value = (source.configuration as Record<string, unknown>)[configurationKey]
-    if (value === undefined) {
-      continue
-    }
-
-    auth[field.key] = value
-    if (configurationKey !== field.key) {
-      auth[configurationKey] = value
-    }
-  }
-
-  return auth
+  return pluginRuntime.buildErrorSourceAuth({
+    pluginId,
+    source: pluginSourceRecord(source),
+  })
 }
 
 function buildGenericPluginSyncInput(args: {
@@ -979,7 +964,7 @@ export class ErrorSourceSyncService {
       'listIssueEvents',
     )
 
-    const auth = buildPluginAuthFromSource(source, this.pluginRuntime)
+    const auth = await buildPluginAuthFromSource(source, this.pluginRuntime)
     const syncStartedAt = new Date().toISOString()
     const since = source.lastSyncAt ?? undefined
     const until = syncStartedAt

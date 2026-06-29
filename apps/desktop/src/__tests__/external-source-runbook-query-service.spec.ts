@@ -4,6 +4,7 @@ import { ExternalSourceRunbookQueryService } from '@bitsentry-ce/core/features/e
 import type { ErrorSource } from '@bitsentry-ce/core/features/error-sources/desktop-error-sources.types'
 import {
   DesktopPluginRuntimeService,
+  type DesktopPluginErrorSourceRecord,
   type DesktopPluginDescriptor,
   type DesktopPluginExecutionRequest,
   type DesktopPluginExecutionResult,
@@ -86,23 +87,18 @@ function createWazuhDescriptor(): DesktopPluginDescriptor {
         setupFields: [
           {
             key: 'indexUrl',
-            storage: 'configuration',
-            configurationKey: 'baseUrl',
             label: 'Wazuh index URL',
             required: true,
             control: 'text',
           },
           {
             key: 'indexPassword',
-            storage: 'accessTokenRef',
             label: 'Wazuh index password',
             required: true,
             control: 'password',
           },
           {
             key: 'indexPatterns',
-            storage: 'configuration',
-            configurationKey: 'indexPatterns',
             label: 'Index patterns',
             required: false,
             control: 'multiline_list',
@@ -133,23 +129,18 @@ function createSentryDescriptor(): DesktopPluginDescriptor {
         setupFields: [
           {
             key: 'authToken',
-            storage: 'accessTokenRef',
             label: 'Sentry auth token',
             required: true,
             control: 'password',
           },
           {
-            key: 'organizationSlug',
-            storage: 'configuration',
-            configurationKey: 'orgSlug',
+            key: 'orgSlug',
             label: 'Organization slug',
             required: true,
             control: 'text',
           },
           {
             key: 'projectSlugs',
-            storage: 'configuration',
-            configurationKey: 'projectSlugs',
             label: 'Project slugs',
             required: false,
             control: 'multiline_list',
@@ -178,11 +169,66 @@ class TestPluginRuntimeService extends DesktopPluginRuntimeService {
     return this.descriptors.find((plugin) => plugin.id === pluginId) ?? null
   }
 
+  override buildErrorSourceAuth(input: {
+    pluginId: string
+    source: DesktopPluginErrorSourceRecord
+  }): Promise<Record<string, unknown>> {
+    if (input.pluginId === 'sentry') {
+      return Promise.resolve(buildSentryAuth(input.source))
+    }
+    if (input.pluginId === 'wazuh') {
+      return Promise.resolve(buildWazuhAuth(input.source))
+    }
+
+    return super.buildErrorSourceAuth(input)
+  }
+
   override executeAction(
     input: DesktopPluginExecutionRequest,
   ): Promise<DesktopPluginExecutionResult> {
     return this.executeActionMock(input)
   }
+}
+
+function readString(value: unknown): string {
+  if (typeof value !== 'string') {
+    return ''
+  }
+
+  return value.trim()
+}
+
+function buildSentryAuth(
+  source: DesktopPluginErrorSourceRecord,
+): Record<string, unknown> {
+  const auth: Record<string, unknown> = { ...source.configuration }
+  const accessToken = readString(source.accessTokenRef)
+  if (accessToken.length > 0) {
+    auth.authToken = accessToken
+    auth.accessToken = accessToken
+  }
+  const orgSlug = readString(source.configuration.orgSlug)
+  if (orgSlug.length > 0) {
+    auth.organizationSlug = orgSlug
+  }
+
+  return auth
+}
+
+function buildWazuhAuth(
+  source: DesktopPluginErrorSourceRecord,
+): Record<string, unknown> {
+  const auth: Record<string, unknown> = { ...source.configuration }
+  const baseUrl = readString(source.configuration.baseUrl)
+  if (baseUrl.length > 0) {
+    auth.indexUrl = baseUrl
+  }
+  const indexPassword = readString(source.accessTokenRef)
+  if (indexPassword.length > 0) {
+    auth.indexPassword = indexPassword
+  }
+
+  return auth
 }
 
 describe('ExternalSourceRunbookQueryService code plugin queries', () => {
@@ -194,7 +240,7 @@ describe('ExternalSourceRunbookQueryService code plugin queries', () => {
     }
     const providerFactory = {
       getProvider: vi.fn(() => {
-        throw new Error('Sentry should not use a built-in provider')
+        throw new Error('Sentry should not use a host-owned provider')
       }),
     }
     const pluginRuntime = new TestPluginRuntimeService([createSentryDescriptor()])
@@ -261,7 +307,7 @@ describe('ExternalSourceRunbookQueryService code plugin queries', () => {
     }
     const providerFactory = {
       getProvider: vi.fn(() => {
-        throw new Error('Wazuh should not use a built-in provider')
+        throw new Error('Wazuh should not use a host-owned provider')
       }),
     }
     const pluginRuntime = new TestPluginRuntimeService([createWazuhDescriptor()])

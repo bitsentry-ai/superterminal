@@ -612,14 +612,8 @@ export type PluginErrorSourceSetupFieldControl =
   | "password"
   | "multiline_list";
 
-export type PluginErrorSourceSetupFieldStorage =
-  | "accessTokenRef"
-  | "configuration";
-
 export interface PluginErrorSourceSetupField {
   key: string;
-  storage: PluginErrorSourceSetupFieldStorage;
-  configurationKey?: string;
   label: string;
   placeholder?: string;
   description?: string;

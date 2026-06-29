@@ -13,6 +13,8 @@ import type { DesktopOauthManagerService } from './desktop-oauth-manager'
 import type { ErrorSource, ErrorSourceConfiguration, ErrorSourceType, LogLevelThreshold } from './desktop-error-sources.types'
 import type {
   DesktopPluginErrorSourceSetupField,
+  DesktopPluginErrorSourceRecord,
+  DesktopPluginPersistedErrorSourceSetup,
   DesktopPluginRuntimeService,
 } from '../plugins'
 import {
@@ -23,10 +25,6 @@ import {
   resolveErrorSourceProviderActionId,
 } from './desktop-plugin-error-source-actions'
 
-const POSTHOG_PROJECT_SCOPED_API_KEY_MESSAGE =
-  'This PostHog API key is scoped to specific projects. Add at least one numeric Project ID so BitSentry can use PostHog project-based endpoints.'
-const POSTHOG_PROJECT_SCOPED_ENDPOINT_ERROR =
-  'API keys with scoped projects are only supported on project-based endpoints'
 const INTERRUPTED_SYNC_MESSAGE = 'Previous sync was interrupted before completion.'
 const handlerPayloadSchema = z.record(z.string(), z.unknown())
 const createErrorSourcePayloadSchema = z
@@ -207,7 +205,7 @@ function readOAuthConfigurationOverrides(
 }
 
 function buildPluginOAuthConfiguration(input: {
-  persistedSetup: PersistedPluginSetup
+  persistedSetup: DesktopPluginPersistedErrorSourceSetup
   oauthClientId?: string
   oauthClientSecret?: string
   oauthRedirectUri?: string
@@ -275,11 +273,6 @@ function readPluginId(value: unknown): string | undefined {
   return normalized
 }
 
-type PersistedPluginSetup = {
-  accessTokenRef?: string
-  configuration: Record<string, unknown>
-}
-
 function readDelimitedStringArray(value: unknown): string[] {
   if (typeof value === 'string') {
     return value
@@ -331,32 +324,27 @@ function hasMatchingErrorSourcePlugin(
   return errorSource?.sourceType === sourceType
 }
 
-function resolvePersistedPluginSetup(
+async function resolvePersistedPluginSetup(
   pluginRuntime: DesktopPluginRuntimeService,
   pluginId: string,
   setupValues: Record<string, unknown>,
-): PersistedPluginSetup {
-  const persisted: PersistedPluginSetup = {
-    configuration: {},
-  }
-
-  for (const field of readPluginErrorSourceSetupFields(pluginRuntime, pluginId)) {
+): Promise<DesktopPluginPersistedErrorSourceSetup> {
+  const setupFields = readPluginErrorSourceSetupFields(pluginRuntime, pluginId)
+  const setupFieldKeys = new Set(setupFields.map((field) => field.key))
+  const normalizedSetupValues: Record<string, unknown> = Object.fromEntries(
+    Object.entries(setupValues).filter(([key]) => !setupFieldKeys.has(key)),
+  )
+  for (const field of setupFields) {
     const value = readPluginSetupFieldValue(field, setupValues)
-    if (value === undefined) {
-      continue
+    if (value !== undefined) {
+      normalizedSetupValues[field.key] = value
     }
-
-    if (field.storage === 'accessTokenRef') {
-      if (typeof value === 'string') {
-        persisted.accessTokenRef = value
-      }
-      continue
-    }
-
-    persisted.configuration[field.configurationKey ?? field.key] = value
   }
 
-  return persisted
+  return pluginRuntime.resolveErrorSourceSetup({
+    pluginId,
+    setupValues: normalizedSetupValues,
+  })
 }
 
 function readSourcePluginId(source: ErrorSource): string {
@@ -386,12 +374,6 @@ function mergeErrorSourceAdditionalMetadata(
   }
 
   return nextMetadata
-}
-
-function resolveStoredErrorSourceToken(
-  value: string | null | undefined,
-): string {
-  return value?.trim() ?? ''
 }
 
 function toRendererErrorSource(source: ErrorSource) {
@@ -523,71 +505,39 @@ function readPluginConnectionIndexPattern(
   return undefined
 }
 
-function buildPluginAuthFromSource(
+function pluginSourceRecord(source: ErrorSource): DesktopPluginErrorSourceRecord {
+  return {
+    id: source.id,
+    sourceType: source.sourceType,
+    name: source.name,
+    accessTokenRef: source.accessTokenRef,
+    refreshTokenRef: source.refreshTokenRef,
+    expiresAt: source.expiresAt,
+    grantedScopes: source.grantedScopes,
+    configuration: { ...source.configuration },
+  }
+}
+
+async function buildPluginAuthFromSource(
   source: ErrorSource,
   pluginRuntime: DesktopPluginRuntimeService,
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const pluginId = readSourcePluginId(source)
-  const auth: Record<string, unknown> = {}
-  const accessToken = resolveStoredErrorSourceToken(source.accessTokenRef)
-
-  for (const field of readPluginErrorSourceSetupFields(pluginRuntime, pluginId)) {
-    if (field.storage === 'accessTokenRef') {
-      if (accessToken.length > 0) {
-        auth[field.key] = accessToken
-        auth.accessToken = accessToken
-      }
-      continue
-    }
-
-    const configurationKey = field.configurationKey ?? field.key
-    const value = (source.configuration as Record<string, unknown>)[configurationKey]
-    if (value === undefined) {
-      continue
-    }
-
-    auth[field.key] = value
-    if (configurationKey !== field.key) {
-      auth[configurationKey] = value
-    }
-  }
-
-  return auth
+  return pluginRuntime.buildErrorSourceAuth({
+    pluginId,
+    source: pluginSourceRecord(source),
+  })
 }
 
 function buildPluginProbeAuth(input: {
   pluginRuntime: DesktopPluginRuntimeService
   pluginId: string
-  persistedSetup: PersistedPluginSetup
-}): Record<string, unknown> {
-  const auth: Record<string, unknown> = {}
-  const accessToken = input.persistedSetup.accessTokenRef?.trim()
-
-  for (const field of readPluginErrorSourceSetupFields(
-    input.pluginRuntime,
-    input.pluginId,
-  )) {
-    if (field.storage === 'accessTokenRef') {
-      if (accessToken !== undefined && accessToken.length > 0) {
-        auth[field.key] = accessToken
-        auth.accessToken = accessToken
-      }
-      continue
-    }
-
-    const configurationKey = field.configurationKey ?? field.key
-    const value = input.persistedSetup.configuration[configurationKey]
-    if (value === undefined) {
-      continue
-    }
-
-    auth[field.key] = value
-    if (configurationKey !== field.key) {
-      auth[configurationKey] = value
-    }
-  }
-
-  return auth
+  persistedSetup: DesktopPluginPersistedErrorSourceSetup
+}): Promise<Record<string, unknown>> {
+  return input.pluginRuntime.buildErrorSourceProbeAuth({
+    pluginId: input.pluginId,
+    persistedSetup: input.persistedSetup,
+  })
 }
 
 function readPluginIssueCount(data: unknown): number {
@@ -686,10 +636,6 @@ function isMissingPluginAuthError(error: unknown): boolean {
   )
 }
 
-function isPostHogProjectScopedEndpointError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes(POSTHOG_PROJECT_SCOPED_ENDPOINT_ERROR)
-}
-
 function recoverInterruptedSyncs(
   sourcesRepository: SqliteErrorSourcesRepositoryAdapter,
 ): Promise<void> {
@@ -750,14 +696,6 @@ export function createDesktopErrorSourcesHandlers(
     return orgs.filter((org) => org.id === requestedOrgSlug)
   }
 
-  function useProjectSlugForProbe(pluginId: string): boolean {
-    const fields =
-      pluginRuntime.getPlugin(pluginId)?.metadata?.errorSource?.setupFields ?? []
-    return fields.some(
-      (field) => (field.configurationKey ?? field.key) === 'projectSlugs',
-    )
-  }
-
   return {
 
     'errorSources:probeConnection': async (rawPayload: unknown) => {
@@ -765,7 +703,7 @@ export function createDesktopErrorSourcesHandlers(
       const sourceType = payload.sourceType
       const pluginId = readPluginId(payload.pluginId) ?? sourceType
       const setupValues = readPayloadRecord(payload.setupValues) ?? {}
-      const persistedSetup = resolvePersistedPluginSetup(
+      const persistedSetup = await resolvePersistedPluginSetup(
         pluginRuntime,
         pluginId,
         setupValues,
@@ -791,7 +729,7 @@ export function createDesktopErrorSourcesHandlers(
       }
 
       try {
-        const auth = buildPluginProbeAuth({
+        const auth = await buildPluginProbeAuth({
           pluginRuntime,
           pluginId,
           persistedSetup,
@@ -811,7 +749,8 @@ export function createDesktopErrorSourcesHandlers(
           readProbeOrganizations(orgResult.data),
           requestedOrgSlug,
         )
-        const projectIdFieldUsesSlug = useProjectSlugForProbe(pluginId)
+        const projectIdFieldUsesSlug =
+          pluginRuntime.getErrorSourceProbeProjectIdentity(pluginId) === 'slug'
         const canListProjects = hasErrorSourceProviderAction(plugin, 'listProjects')
 
         const projects: ProbeProject[] = []
@@ -851,10 +790,7 @@ export function createDesktopErrorSourcesHandlers(
         return { organizations, projects }
       } catch (error) {
         log.warn('[error-sources] probeConnection:failed', error)
-        let detail = getErrorMessage(error)
-        if (sourceType === 'posthog' && isPostHogProjectScopedEndpointError(error)) {
-          detail = POSTHOG_PROJECT_SCOPED_API_KEY_MESSAGE
-        }
+        const detail = getErrorMessage(error)
         throw new Error(`Probe failed: ${detail}`)
       }
     },
@@ -878,7 +814,7 @@ export function createDesktopErrorSourcesHandlers(
       const sourceType = payload.sourceType
       const pluginId = readPluginId(payload.pluginId) ?? sourceType
       const setupValues = readPayloadRecord(payload.setupValues) ?? {}
-      const persistedSetup = resolvePersistedPluginSetup(
+      const persistedSetup = await resolvePersistedPluginSetup(
         pluginRuntime,
         pluginId,
         setupValues,
@@ -932,7 +868,7 @@ export function createDesktopErrorSourcesHandlers(
       if (existing === null) throw new Error(`Error source ${payload.id} not found`)
       const setupValues = readPayloadRecord(payload.setupValues) ?? {}
       const pluginId = readSourcePluginId(existing)
-      const persistedSetup = resolvePersistedPluginSetup(
+      const persistedSetup = await resolvePersistedPluginSetup(
         pluginRuntime,
         pluginId,
         setupValues,
@@ -990,7 +926,7 @@ export function createDesktopErrorSourcesHandlers(
       )
       const pluginId = readPluginId(payload.pluginId) ?? sourceType
       const setupValues = readPayloadRecord(payload.setupValues) ?? {}
-      const persistedSetup = resolvePersistedPluginSetup(
+      const persistedSetup = await resolvePersistedPluginSetup(
         pluginRuntime,
         pluginId,
         setupValues,
@@ -1024,7 +960,7 @@ export function createDesktopErrorSourcesHandlers(
       const state = payload.state.trim()
       const pluginId = readPluginId(payload.pluginId) ?? sourceType
       const setupValues = readPayloadRecord(payload.setupValues) ?? {}
-      const persistedSetup = resolvePersistedPluginSetup(
+      const persistedSetup = await resolvePersistedPluginSetup(
         pluginRuntime,
         pluginId,
         setupValues,
@@ -1121,7 +1057,7 @@ export function createDesktopErrorSourcesHandlers(
         )
       }
 
-      const auth = buildPluginAuthFromSource(source, pluginRuntime)
+      const auth = await buildPluginAuthFromSource(source, pluginRuntime)
       const input = buildGenericPluginConnectionInput(source)
 
       try {

@@ -8,9 +8,11 @@ import {
 } from '@bitsentry-ce/core/features/error-sources/desktop-oauth-manager'
 import {
   DesktopPluginRuntimeService,
+  type DesktopPluginErrorSourceRecord,
   type DesktopPluginDescriptor,
   type DesktopPluginExecutionRequest,
   type DesktopPluginExecutionResult,
+  type DesktopPluginPersistedErrorSourceSetup,
 } from '@bitsentry-ce/core/features/plugins'
 
 class TestPluginRuntimeService extends DesktopPluginRuntimeService {
@@ -30,11 +32,116 @@ class TestPluginRuntimeService extends DesktopPluginRuntimeService {
     return this.descriptors.find((plugin) => plugin.id === pluginId) ?? null
   }
 
+  override resolveErrorSourceSetup(input: {
+    pluginId: string
+    setupValues: Record<string, unknown>
+  }): Promise<DesktopPluginPersistedErrorSourceSetup> {
+    if (input.pluginId !== 'posthog') {
+      return super.resolveErrorSourceSetup(input)
+    }
+
+    return Promise.resolve(buildPostHogPersistedSetup(input.setupValues))
+  }
+
+  override buildErrorSourceAuth(input: {
+    pluginId: string
+    source: DesktopPluginErrorSourceRecord
+  }): Promise<Record<string, unknown>> {
+    if (input.pluginId !== 'posthog') {
+      return super.buildErrorSourceAuth(input)
+    }
+
+    return Promise.resolve(
+      buildPostHogAuth(input.source.accessTokenRef, input.source.configuration),
+    )
+  }
+
+  override buildErrorSourceProbeAuth(input: {
+    pluginId: string
+    persistedSetup: DesktopPluginPersistedErrorSourceSetup
+  }): Promise<Record<string, unknown>> {
+    if (input.pluginId !== 'posthog') {
+      return super.buildErrorSourceProbeAuth(input)
+    }
+
+    return Promise.resolve(
+      buildPostHogAuth(
+        input.persistedSetup.accessTokenRef,
+        input.persistedSetup.configuration,
+      ),
+    )
+  }
+
   override executeAction(
     input: DesktopPluginExecutionRequest,
   ): Promise<DesktopPluginExecutionResult> {
     return this.executeActionMock(input)
   }
+}
+
+function readString(value: unknown): string {
+  if (typeof value !== 'string') {
+    return ''
+  }
+
+  return value.trim()
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+}
+
+function buildPostHogPersistedSetup(
+  setupValues: Record<string, unknown>,
+): DesktopPluginPersistedErrorSourceSetup {
+  const configuration: Record<string, unknown> = {}
+  const baseUrl = readString(setupValues.baseUrl)
+  const orgSlug = readString(setupValues.orgSlug) || readString(setupValues.organizationId)
+  const projectIds = readStringArray(setupValues.projectIds)
+  if (baseUrl.length > 0) {
+    configuration.baseUrl = baseUrl
+  }
+  if (orgSlug.length > 0) {
+    configuration.orgSlug = orgSlug
+  }
+  if (projectIds.length > 0) {
+    configuration.projectIds = projectIds
+  }
+
+  const accessToken = readString(setupValues.accessToken) || readString(setupValues.authToken)
+  let accessTokenRef: string | undefined
+  if (accessToken.length > 0) {
+    accessTokenRef = accessToken
+  }
+  return {
+    accessTokenRef,
+    configuration,
+  }
+}
+
+function buildPostHogAuth(
+  accessTokenRef: string | null | undefined,
+  configuration: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const auth = { ...(configuration ?? {}) }
+  const accessToken = readString(accessTokenRef)
+  if (accessToken.length > 0) {
+    auth.authToken = accessToken
+    auth.accessToken = accessToken
+  }
+  const orgSlug = readString(configuration?.orgSlug)
+  if (orgSlug.length > 0) {
+    auth.organizationId = orgSlug
+  }
+
+  return auth
 }
 
 function createProviderAction(
@@ -71,31 +178,24 @@ function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
         setupFields: [
           {
             key: 'accessToken',
-            storage: 'accessTokenRef',
             label: 'API key',
             required: true,
             control: 'password',
           },
           {
             key: 'baseUrl',
-            storage: 'configuration',
-            configurationKey: 'baseUrl',
             label: 'PostHog base URL',
             required: false,
             control: 'text',
           },
           {
-            key: 'organizationId',
-            storage: 'configuration',
-            configurationKey: 'orgSlug',
+            key: 'orgSlug',
             label: 'Organization ID',
             required: false,
             control: 'text',
           },
           {
             key: 'projectIds',
-            storage: 'configuration',
-            configurationKey: 'projectIds',
             label: 'Project IDs',
             required: false,
             control: 'multiline_list',
@@ -211,7 +311,7 @@ describe('desktop error source handlers', () => {
     vi.useRealTimers()
   })
 
-  it('tests built-in-named sources through matching code plugin actions', async () => {
+  it('tests legacy-named sources through matching code plugin actions', async () => {
     vi.useFakeTimers()
     const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])
     runtime.executeActionMock.mockResolvedValue({
@@ -312,7 +412,7 @@ describe('desktop error source handlers', () => {
         setupValues: {
           accessToken: 'phx-token',
           organizationId: 'org-1',
-          baseUrl: 'https://metadata.google.internal',
+          baseUrl: 'https://self-hosted.posthog.internal',
         },
       }),
     ).resolves.toEqual({
@@ -337,7 +437,7 @@ describe('desktop error source handlers', () => {
     const firstProbeRequest = runtime.executeActionMock.mock.calls[0]?.[0]
     expect(firstProbeRequest?.auth).toMatchObject({
       accessToken: 'phx-token',
-      baseUrl: 'https://metadata.google.internal',
+      baseUrl: 'https://self-hosted.posthog.internal',
       orgSlug: 'org-1',
       organizationId: 'org-1',
     })
@@ -373,7 +473,7 @@ describe('desktop error source handlers', () => {
     expect(runtime.executeActionMock).not.toHaveBeenCalled()
   })
 
-  it('creates built-in-named sources through matching code plugin metadata', async () => {
+  it('creates legacy-named sources through matching code plugin metadata', async () => {
     vi.useFakeTimers()
     const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])
     const { db, create } = createTestDb()
@@ -458,7 +558,7 @@ describe('desktop error source handlers', () => {
     expect(create).not.toHaveBeenCalled()
   })
 
-  it('updates built-in-named sources through matching code plugin metadata', async () => {
+  it('updates legacy-named sources through matching code plugin metadata', async () => {
     vi.useFakeTimers()
     const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])
     const { db, update } = createTestDb()
@@ -473,14 +573,14 @@ describe('desktop error source handlers', () => {
         id: 'source-1',
         setupValues: {
           projectIds: ['999'],
-          baseUrl: 'https://metadata.google.internal',
+          baseUrl: 'https://self-hosted.posthog.internal',
         },
       }),
     ).resolves.toMatchObject({
       pluginId: 'posthog',
       sourceType: 'posthog',
       configuration: {
-        baseUrl: 'https://metadata.google.internal',
+        baseUrl: 'https://self-hosted.posthog.internal',
         orgSlug: 'org-1',
         projectIds: ['999'],
       },
@@ -491,7 +591,7 @@ describe('desktop error source handlers', () => {
     const updateCall = update.mock.calls[0]?.[0]
     expect(updateCall).toBeDefined()
     expect(JSON.parse(String(updateCall?.data.configuration))).toEqual({
-      baseUrl: 'https://metadata.google.internal',
+      baseUrl: 'https://self-hosted.posthog.internal',
       orgSlug: 'org-1',
       projectIds: ['999'],
     })
@@ -519,7 +619,7 @@ describe('desktop error source handlers', () => {
     expect(update).not.toHaveBeenCalled()
   })
 
-  it('completes OAuth for built-in-named sources through matching code plugin metadata', async () => {
+  it('completes OAuth for legacy-named sources through matching code plugin metadata', async () => {
     vi.useFakeTimers()
     const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])
     runtime.executeActionMock.mockResolvedValue({

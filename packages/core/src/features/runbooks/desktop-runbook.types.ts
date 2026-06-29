@@ -396,15 +396,6 @@ const RUNBOOK_TRIGGER_CONTEXT_STRING_FIELDS = [
   "sourceName",
   "incidentThreadId",
 ] as const satisfies readonly (keyof RunbookTriggerContext)[];
-const RUNBOOK_TRIGGER_SOURCE_TYPE_VALUES = [
-  "sentry",
-  "wazuh",
-  "posthog",
-] as const satisfies readonly NonNullable<RunbookTriggerContext["sourceType"]>[];
-const RUNBOOK_TRIGGER_SOURCE_TYPES = new Set<string>(
-  RUNBOOK_TRIGGER_SOURCE_TYPE_VALUES,
-);
-
 function isRunbookExecutionSource(
   value: string,
 ): value is RunbookExecutionSource {
@@ -422,18 +413,6 @@ function isRunbookTriggerSurface(
 ): value is RunbookTriggerSurface {
   for (const surface of RUNBOOK_TRIGGER_SURFACE_VALUES) {
     if (surface === value) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function isRunbookTriggerSourceType(
-  value: string,
-): value is NonNullable<RunbookTriggerContext["sourceType"]> {
-  for (const sourceType of RUNBOOK_TRIGGER_SOURCE_TYPE_VALUES) {
-    if (sourceType === value) {
       return true;
     }
   }
@@ -482,11 +461,12 @@ function parseRunbookTriggerSourceType(
     return undefined;
   }
 
-  if (isRunbookTriggerSourceType(value)) {
-    return value;
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return undefined;
   }
 
-  return undefined;
+  return normalized;
 }
 
 export function parseRunbookExecutionSource(

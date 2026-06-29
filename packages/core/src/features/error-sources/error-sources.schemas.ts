@@ -3,8 +3,6 @@ import { z } from 'zod';
 export const errorSourceTypeSchema = z.string().trim().min(1);
 export type ErrorSourceType = z.infer<typeof errorSourceTypeSchema>;
 
-export const POSTHOG_DEFAULT_BASE_URL = 'https://us.posthog.com';
-
 export const logLevelThresholdSchema = z.enum([
   'error',
   'warning',

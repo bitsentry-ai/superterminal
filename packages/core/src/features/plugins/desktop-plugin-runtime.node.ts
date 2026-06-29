@@ -200,9 +200,9 @@ function defaultLocalPluginDirectories(): string[] {
 
   return Array.from(
     new Set([
+      path.join(workspaceRoot, ".bitsentry", "plugins"),
       resolveRepoManagedPluginDirectory(workspaceRoot),
       bundledDirectory,
-      path.join(workspaceRoot, ".bitsentry", "plugins"),
     ]),
   );
 }
