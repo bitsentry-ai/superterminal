@@ -11,10 +11,6 @@ import { ErrorSourceSyncService } from './desktop-error-source-sync.service'
 import { getProviderForSource } from './desktop-posthog-provider-binding'
 import { SyncSchedulerService } from './desktop-sync-scheduler.service'
 import type { DesktopOauthManagerService } from './desktop-oauth-manager'
-import type {
-  ErrorSourceProvider,
-  ProjectSummary,
-} from './desktop-error-source-provider.interface'
 import type { ErrorSource, ErrorSourceConfiguration, ErrorSourceType, LogLevelThreshold } from './desktop-error-sources.types'
 import type {
   DesktopPluginErrorSourceSetupField,
@@ -139,14 +135,6 @@ type DesktopOauthManagerServiceClass = new (
   db: DbClient,
   providerFactory: ErrorSourceProviderFactory,
 ) => DesktopOauthManagerService
-
-type PostHogProjectProvider = ErrorSourceProvider & {
-  getProject(input: {
-    accessToken: string
-    projectId: string
-    signal?: AbortSignal
-  }): Promise<ProjectSummary>
-}
 
 let syncScheduler: SyncSchedulerService | null = null
 let interruptedSyncRecovery: Promise<void> | null = null
@@ -466,16 +454,6 @@ function mergeErrorSourceAdditionalMetadata(
   }
 
   return nextMetadata
-}
-
-function hasPostHogProjectAccess(
-  provider: unknown,
-): provider is PostHogProjectProvider {
-  if (provider === null || provider === undefined) {
-    return false
-  }
-
-  return typeof (provider as { getProject?: unknown }).getProject === 'function'
 }
 
 function resolveStoredErrorSourceToken(
@@ -1168,140 +1146,98 @@ export function createDesktopErrorSourcesHandlers(
       const pluginId = readSourcePluginId(source)
       const plugin = pluginRuntime.getPlugin(pluginId)
 
-      if (plugin?.metadata?.errorSource?.sourceType === source.sourceType) {
-        const auth = buildPluginAuthFromSource(source, pluginRuntime)
-        const input = buildGenericPluginConnectionInput(source)
-
-        try {
-          if (hasErrorSourceProviderAction(plugin, 'queryIssues')) {
-            const result = await pluginRuntime.executeAction({
-              pluginId,
-              actionId: resolveErrorSourceProviderActionId({
-                runtime: pluginRuntime,
-                pluginId,
-                sourceType: source.sourceType,
-                action: 'queryIssues',
-              }),
-              auth,
-              input,
-            })
-            const issueBatch = readPluginIssueBatch(result.data)
-            const issueCount = issueBatch?.issues.length ?? readPluginIssueCount(result.data)
-            return {
-              success: true,
-              provider: source.sourceType,
-              organizationCount: readConfiguredOrganizationCount(source.configuration),
-              projectCount: issueCount,
-            }
-          }
-
-          if (hasErrorSourceProviderAction(plugin, 'searchAlerts')) {
-            const result = await pluginRuntime.executeAction({
-              pluginId,
-              actionId: resolveErrorSourceProviderActionId({
-                runtime: pluginRuntime,
-                pluginId,
-                sourceType: source.sourceType,
-                action: 'searchAlerts',
-              }),
-              auth,
-              input,
-            })
-            const issueCount = readPluginIssueCount(result.data)
-            return {
-              success: true,
-              provider: source.sourceType,
-              organizationCount: readConfiguredOrganizationCount(source.configuration),
-              projectCount: issueCount,
-            }
-          }
-
-          if (hasErrorSourceProviderAction(plugin, 'listOrganizations')) {
-            const result = await pluginRuntime.executeAction({
-              pluginId,
-              actionId: resolveErrorSourceProviderActionId({
-                runtime: pluginRuntime,
-                pluginId,
-                sourceType: source.sourceType,
-                action: 'listOrganizations',
-              }),
-              auth,
-              input: {},
-            })
-            const organizations = readUnknownArray(result.data)
-            return {
-              success: true,
-              provider: source.sourceType,
-              organizationCount: organizations.length,
-              projectCount: 0,
-            }
-          }
-        } catch (error) {
-          if (isMissingPluginAuthError(error)) {
-            log.info(
-              `[error-sources] testConnection:plugin sourceId=${source.id} missing plugin auth`,
-            )
-            return {
-              success: false,
-              provider: source.sourceType,
-              organizationCount: 0,
-              projectCount: 0,
-            }
-          }
-
-          throw error
-        }
-      }
-
-      const accessToken = resolveStoredErrorSourceToken(source.accessTokenRef)
-      if (accessToken.length === 0) {
-        throw new Error('Access token not found for this source')
-      }
-
-      const provider = getProviderForSource(providerFactory, source)
-
-      if (source.sourceType === 'posthog' && hasPostHogProjectAccess(provider)) {
-        const projectIds = readStringArray(
-          source.configuration.projectIds ?? source.configuration.projectSlugs,
+      if (plugin?.metadata?.errorSource?.sourceType !== source.sourceType) {
+        throw new Error(
+          `Error source plugin "${pluginId}" does not match source type ${source.sourceType}`,
         )
-        if (projectIds.length > 0) {
-          await Promise.all(
-            projectIds.map((projectId) => provider.getProject({ accessToken, projectId })),
-          )
-          log.info(
-            `[error-sources] testConnection:success sourceId=${source.id} projects=${String(projectIds.length)}`,
-          )
-          let organizationCount = 0
-          if (source.configuration.orgSlug !== undefined && source.configuration.orgSlug.length > 0) {
-            organizationCount = 1
-          }
+      }
+
+      const auth = buildPluginAuthFromSource(source, pluginRuntime)
+      const input = buildGenericPluginConnectionInput(source)
+
+      try {
+        if (hasErrorSourceProviderAction(plugin, 'queryIssues')) {
+          const result = await pluginRuntime.executeAction({
+            pluginId,
+            actionId: resolveErrorSourceProviderActionId({
+              runtime: pluginRuntime,
+              pluginId,
+              sourceType: source.sourceType,
+              action: 'queryIssues',
+            }),
+            auth,
+            input,
+          })
+          const issueBatch = readPluginIssueBatch(result.data)
+          const issueCount = issueBatch?.issues.length ?? readPluginIssueCount(result.data)
           return {
             success: true,
             provider: source.sourceType,
-            organizationCount,
-            projectCount: projectIds.length,
+            organizationCount: readConfiguredOrganizationCount(source.configuration),
+            projectCount: issueCount,
           }
         }
-      }
 
-      let organizations: Awaited<ReturnType<typeof provider.listOrganizations>>
-      try {
-        organizations = await provider.listOrganizations(accessToken)
-      } catch (error) {
-        if (source.sourceType === 'posthog' && isPostHogProjectScopedEndpointError(error)) {
-          throw new Error(POSTHOG_PROJECT_SCOPED_API_KEY_MESSAGE)
+        if (hasErrorSourceProviderAction(plugin, 'searchAlerts')) {
+          const result = await pluginRuntime.executeAction({
+            pluginId,
+            actionId: resolveErrorSourceProviderActionId({
+              runtime: pluginRuntime,
+              pluginId,
+              sourceType: source.sourceType,
+              action: 'searchAlerts',
+            }),
+            auth,
+            input,
+          })
+          const issueCount = readPluginIssueCount(result.data)
+          return {
+            success: true,
+            provider: source.sourceType,
+            organizationCount: readConfiguredOrganizationCount(source.configuration),
+            projectCount: issueCount,
+          }
         }
+
+        if (hasErrorSourceProviderAction(plugin, 'listOrganizations')) {
+          const result = await pluginRuntime.executeAction({
+            pluginId,
+            actionId: resolveErrorSourceProviderActionId({
+              runtime: pluginRuntime,
+              pluginId,
+              sourceType: source.sourceType,
+              action: 'listOrganizations',
+            }),
+            auth,
+            input: {},
+          })
+          const organizations = readUnknownArray(result.data)
+          return {
+            success: true,
+            provider: source.sourceType,
+            organizationCount: organizations.length,
+            projectCount: 0,
+          }
+        }
+      } catch (error) {
+        if (isMissingPluginAuthError(error)) {
+          log.info(
+            `[error-sources] testConnection:plugin sourceId=${source.id} missing plugin auth`,
+          )
+          return {
+            success: false,
+            provider: source.sourceType,
+            organizationCount: 0,
+            projectCount: 0,
+          }
+        }
+
         throw error
       }
-      log.info(
-        `[error-sources] testConnection:success sourceId=${source.id} organizations=${String(organizations.length)}`,
+
+      throw new Error(
+        `Error source plugin "${pluginId}" does not expose a connection test action`,
       )
-      return {
-        success: true,
-        provider: source.sourceType,
-        organizationCount: organizations.length,
-        projectCount: 0,
-      }
     },
 
     'errorSources:triggerSync': async (rawPayload: unknown) => {
