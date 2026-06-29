@@ -78,6 +78,8 @@ function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
     },
     actions: [
       createProviderAction('exchange_code_for_token'),
+      createProviderAction('list_organizations'),
+      createProviderAction('list_projects'),
       createProviderAction('query_issues'),
     ],
     triggers: [],
@@ -230,6 +232,105 @@ describe('desktop error source handlers', () => {
 
     await expect(
       handlers['errorSources:testConnection']?.({ id: 'source-1' }),
+    ).rejects.toThrow(
+      'Error source plugin "posthog" does not match source type posthog',
+    )
+    expect(runtime.executeActionMock).not.toHaveBeenCalled()
+  })
+
+  it('probes connections through matching code plugin actions', async () => {
+    const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])
+    runtime.executeActionMock.mockImplementation((input) => {
+      if (input.actionId === 'list_organizations') {
+        return Promise.resolve({
+          pluginId: input.pluginId,
+          actionId: input.actionId,
+          ok: true,
+          status: 200,
+          summary: 'Listed organizations.',
+          data: [
+            { slug: 'org-1', name: 'Production' },
+            { slug: 'org-2', name: 'Staging' },
+          ],
+        })
+      }
+
+      return Promise.resolve({
+        pluginId: input.pluginId,
+        actionId: input.actionId,
+        ok: true,
+        status: 200,
+        summary: 'Listed projects.',
+        data: [
+          { id: '177710', slug: 'product-analytics', name: 'Product Analytics' },
+        ],
+      })
+    })
+    const oauthBindings = createDesktopOauthManagerBindings(
+      'bitsentry-desktop-ce://oauth/callback',
+    )
+    const handlers = createDesktopErrorSourcesHandlers(createDb(), {
+      OauthManagerService: oauthBindings.OauthManagerService,
+      pluginRuntime: runtime,
+    })
+
+    await expect(
+      handlers['errorSources:probeConnection']?.({
+        pluginId: 'posthog',
+        sourceType: 'posthog',
+        authToken: 'phx-token',
+        organizationId: 'org-1',
+        baseUrl: 'https://metadata.google.internal',
+      }),
+    ).resolves.toEqual({
+      organizations: [{ id: 'org-1', name: 'Production' }],
+      projects: [
+        {
+          id: '177710',
+          name: 'Product Analytics',
+          orgId: 'org-1',
+        },
+      ],
+    })
+
+    expect(runtime.executeActionMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        pluginId: 'posthog',
+        actionId: 'list_organizations',
+        auth: {
+          accessToken: 'phx-token',
+          baseUrl: 'https://metadata.google.internal',
+        },
+        input: {},
+      }),
+    )
+    expect(runtime.executeActionMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        pluginId: 'posthog',
+        actionId: 'list_projects',
+        input: { orgSlug: 'org-1' },
+      }),
+    )
+  })
+
+  it('rejects connection probes without a matching code plugin', async () => {
+    const runtime = new TestPluginRuntimeService([])
+    const oauthBindings = createDesktopOauthManagerBindings(
+      'bitsentry-desktop-ce://oauth/callback',
+    )
+    const handlers = createDesktopErrorSourcesHandlers(createDb(), {
+      OauthManagerService: oauthBindings.OauthManagerService,
+      pluginRuntime: runtime,
+    })
+
+    await expect(
+      handlers['errorSources:probeConnection']?.({
+        pluginId: 'posthog',
+        sourceType: 'posthog',
+        authToken: 'phx-token',
+      }),
     ).rejects.toThrow(
       'Error source plugin "posthog" does not match source type posthog',
     )

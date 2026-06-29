@@ -8,7 +8,6 @@ import { SqliteErrorIssuesRepositoryAdapter } from './desktop-sqlite-error-issue
 import { SqliteErrorEventsRepositoryAdapter } from './desktop-sqlite-error-events.adapter'
 import { ErrorSourceProviderFactory } from './desktop-error-source-provider.factory'
 import { ErrorSourceSyncService } from './desktop-error-source-sync.service'
-import { getProviderForSource } from './desktop-posthog-provider-binding'
 import { SyncSchedulerService } from './desktop-sync-scheduler.service'
 import type { DesktopOauthManagerService } from './desktop-oauth-manager'
 import type { ErrorSource, ErrorSourceConfiguration, ErrorSourceType, LogLevelThreshold } from './desktop-error-sources.types'
@@ -111,6 +110,8 @@ const completeOAuthPayloadSchema = z
   })
   .loose()
 type CompleteOAuthPayload = z.infer<typeof completeOAuthPayloadSchema>
+type ProbeOrganization = { id: string; name: string }
+type ProbeProject = { id: string; name: string; orgId: string }
 const idPayloadSchema = z.object({ id: z.string().min(1) })
 const triggerSyncPayloadSchema = z.object({ id: z.string().optional() }).optional().default({})
 const errorIssuesListPayloadSchema = z.object({
@@ -507,6 +508,74 @@ function readStringArray(value: unknown): string[] {
   })
 }
 
+function readProbeRecord(value: unknown): Record<string, unknown> {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+
+  return {}
+}
+
+function readProbeString(value: unknown, fallback = ''): string {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value)
+  }
+
+  return fallback
+}
+
+function readProbeOrganizations(data: unknown): ProbeOrganization[] {
+  return readUnknownArray(data).map((item) => {
+    const record = readProbeRecord(item)
+    const id = readProbeString(record.slug, readProbeString(record.id)).trim()
+    if (id.length === 0) {
+      throw new Error('Plugin returned an organization without an id')
+    }
+
+    return {
+      id,
+      name: readProbeString(record.name, id),
+    }
+  })
+}
+
+function readProbeProjects(
+  data: unknown,
+  orgId: string,
+  useSlugAsId: boolean,
+): ProbeProject[] {
+  return readUnknownArray(data).map((item) => {
+    const record = readProbeRecord(item)
+    const fallbackId = readProbeString(record.id)
+    const slug = readProbeString(record.slug, fallbackId).trim()
+    let id = fallbackId.trim()
+    if (useSlugAsId) {
+      id = slug
+    }
+    if (id.length === 0) {
+      throw new Error('Plugin returned a project without an id')
+    }
+    let nameFallback = id
+    if (slug.length > 0) {
+      nameFallback = slug
+    }
+
+    return {
+      id,
+      name: readProbeString(record.name, nameFallback),
+      orgId: readProbeString(
+        record.organizationId ?? record.organization ?? record.orgSlug,
+        orgId,
+      ),
+    }
+  })
+}
+
 function readPluginConnectionIndexPattern(
   configuration: ErrorSourceConfiguration,
 ): string | undefined {
@@ -549,6 +618,32 @@ function buildPluginAuthFromSource(
     if (configurationKey !== field.key) {
       auth[configurationKey] = value
     }
+  }
+
+  return auth
+}
+
+function buildPluginProbeAuth(input: {
+  pluginRuntime: DesktopPluginRuntimeService
+  pluginId: string
+  authToken: string
+  baseUrl?: string
+}): Record<string, unknown> {
+  const auth: Record<string, unknown> = {
+    accessToken: input.authToken,
+  }
+
+  for (const field of readPluginErrorSourceSetupFields(
+    input.pluginRuntime,
+    input.pluginId,
+  )) {
+    if (field.storage === 'accessTokenRef' || field.target === 'authToken') {
+      auth[field.key] = input.authToken
+    }
+  }
+
+  if (input.baseUrl !== undefined) {
+    auth.baseUrl = input.baseUrl
   }
 
   return auth
@@ -703,7 +798,7 @@ export function createDesktopErrorSourcesHandlers(
     })
   }
 
-  function filterProbeOrganizations<T extends { slug: string }>(
+  function filterProbeOrganizations<T extends { id: string }>(
     orgs: T[],
     requestedOrgSlug: string | undefined,
   ): T[] {
@@ -711,7 +806,7 @@ export function createDesktopErrorSourcesHandlers(
       return orgs
     }
 
-    return orgs.filter((org) => org.slug === requestedOrgSlug)
+    return orgs.filter((org) => org.id === requestedOrgSlug)
   }
 
   function useProjectSlugForProbe(pluginId: string): boolean {
@@ -738,51 +833,78 @@ export function createDesktopErrorSourcesHandlers(
       const baseUrl = readOptionalTrimmed(
         payload.baseUrl ?? payload.posthogBaseUrl,
       )
-
-      type ProbeOrg = { id: string; name: string }
-      type ProbeProject = { id: string; name: string; orgId: string }
+      const plugin = pluginRuntime.getPlugin(pluginId)
 
       log.info(
         `[error-sources] probeConnection:start type=${sourceType} org=${requestedOrgSlug ?? '<auto>'}`,
       )
 
-      try {
-        let probeConfiguration: { posthogBaseUrl: string } | undefined
-        if (baseUrl !== undefined) {
-          probeConfiguration = { posthogBaseUrl: baseUrl }
-        }
-        const provider = getProviderForSource(providerFactory, {
-          sourceType,
-          additionalMetadata: { pluginId },
-          configuration: probeConfiguration,
-        })
-        const orgs = await provider.listOrganizations(authToken)
-        const visibleOrgs = filterProbeOrganizations(orgs, requestedOrgSlug)
-        const projectIdFieldUsesSlug = useProjectSlugForProbe(pluginId)
+      if (plugin?.metadata?.errorSource?.sourceType !== sourceType) {
+        throw new Error(
+          `Error source plugin "${pluginId}" does not match source type ${sourceType}`,
+        )
+      }
+      if (!hasErrorSourceProviderAction(plugin, 'listOrganizations')) {
+        throw new Error(
+          `Error source plugin "${pluginId}" does not expose listOrganizations for connection probing`,
+        )
+      }
 
-        const organizations: ProbeOrg[] = visibleOrgs.map((org) => ({
-          id: org.slug,
-          name: org.name,
-        }))
+      try {
+        const auth = buildPluginProbeAuth({
+          pluginRuntime,
+          pluginId,
+          authToken,
+          baseUrl,
+        })
+        const orgResult = await pluginRuntime.executeAction({
+          pluginId,
+          actionId: resolveErrorSourceProviderActionId({
+            runtime: pluginRuntime,
+            pluginId,
+            sourceType,
+            action: 'listOrganizations',
+          }),
+          auth,
+          input: {},
+        })
+        const visibleOrgs = filterProbeOrganizations(
+          readProbeOrganizations(orgResult.data),
+          requestedOrgSlug,
+        )
+        const projectIdFieldUsesSlug = useProjectSlugForProbe(pluginId)
+        const canListProjects = hasErrorSourceProviderAction(plugin, 'listProjects')
 
         const projects: ProbeProject[] = []
-        for (const org of visibleOrgs) {
-          const orgProjects = await provider.listProjects({
-            accessToken: authToken,
-            orgSlug: org.slug,
-          })
-          for (const project of orgProjects) {
-            let projectId = project.id
-            if (projectIdFieldUsesSlug) {
-              projectId = project.slug
-            }
-            projects.push({
-              id: projectId,
-              name: project.name,
-              orgId: org.slug,
+        if (canListProjects) {
+          for (const org of visibleOrgs) {
+            const projectResult = await pluginRuntime.executeAction({
+              pluginId,
+              actionId: resolveErrorSourceProviderActionId({
+                runtime: pluginRuntime,
+                pluginId,
+                sourceType,
+                action: 'listProjects',
+              }),
+              auth,
+              input: {
+                orgSlug: org.id,
+              },
             })
+            projects.push(
+              ...readProbeProjects(
+                projectResult.data,
+                org.id,
+                projectIdFieldUsesSlug,
+              ),
+            )
           }
         }
+
+        const organizations: ProbeOrganization[] = visibleOrgs.map((org) => ({
+          id: org.id,
+          name: org.name,
+        }))
 
         log.info(
           `[error-sources] probeConnection:success type=${sourceType} orgs=${String(organizations.length)} projects=${String(projects.length)}`,
