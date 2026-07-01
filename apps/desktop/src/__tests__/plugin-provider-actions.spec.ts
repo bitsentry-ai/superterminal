@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { ErrorSourceProviderFactory } from '@bitsentry-ce/core/features/error-sources'
 import { resolveErrorSourceProviderActionId } from '@bitsentry-ce/core/features/error-sources/desktop-plugin-error-source-actions'
 import {
   DesktopPluginRuntimeService,
@@ -70,7 +69,7 @@ function createProviderAction(
   }
 }
 
-describe('plugin-backed error source provider actions', () => {
+describe('plugin error source provider actions', () => {
   it('resolves conventional code action IDs without provider metadata', () => {
     const runtime = new TestPluginRuntimeService([
       createPluginDescriptor({
@@ -105,29 +104,7 @@ describe('plugin-backed error source provider actions', () => {
     ).toBe('query_issues')
   })
 
-  it('does not register named providers without explicit code plugin actions', () => {
-    const factory = new ErrorSourceProviderFactory(
-      new TestPluginRuntimeService([createPluginDescriptor()]),
-    )
-
-    expect(() => factory.getProvider('posthog')).toThrow(
-      'Unsupported error source type: posthog',
-    )
-  })
-
-  it('registers named providers from conventional code action IDs', () => {
-    const factory = new ErrorSourceProviderFactory(
-      new TestPluginRuntimeService([
-        createPluginDescriptor({
-          actions: [createProviderAction('listOrganizations')],
-        }),
-      ]),
-    )
-
-    expect(factory.getProvider('posthog').sourceType).toBe('posthog')
-  })
-
-  it('registers marketplace source providers from code plugin metadata', async () => {
+  it('executes marketplace source provider actions from code plugin metadata', async () => {
     const runtime = new TestExecutablePluginRuntimeService([
       createPluginDescriptor({
         id: 'github',
@@ -166,20 +143,45 @@ describe('plugin-backed error source provider actions', () => {
       })
     })
 
-    const provider = new ErrorSourceProviderFactory(runtime).getProvider('github')
+    const listOrganizationsActionId = resolveErrorSourceProviderActionId({
+      runtime,
+      pluginId: 'github',
+      sourceType: 'github',
+      action: 'listOrganizations',
+    })
+    const listProjectsActionId = resolveErrorSourceProviderActionId({
+      runtime,
+      pluginId: 'github',
+      sourceType: 'github',
+      action: 'listProjects',
+    })
 
-    await expect(provider.listOrganizations('gh-token')).resolves.toEqual([
-      { slug: 'bitsentry-ai', name: 'BitSentry AI' },
-    ])
     await expect(
-      provider.listProjects({ accessToken: 'gh-token', orgSlug: 'bitsentry-ai' }),
-    ).resolves.toEqual([
+      runtime.executeAction({
+        pluginId: 'github',
+        actionId: listOrganizationsActionId,
+        auth: { accessToken: 'gh-token' },
+        input: {},
+      }),
+    ).resolves.toMatchObject({
+      data: [{ slug: 'bitsentry-ai', name: 'BitSentry AI' }],
+    })
+    await expect(
+      runtime.executeAction({
+        pluginId: 'github',
+        actionId: listProjectsActionId,
+        auth: { accessToken: 'gh-token' },
+        input: { orgSlug: 'bitsentry-ai' },
+      }),
+    ).resolves.toMatchObject({
+      data: [
       {
         id: 'repo-1',
         slug: 'monorepo',
         name: 'monorepo',
       },
-    ])
+      ],
+    })
     expect(runtime.executeActionMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({

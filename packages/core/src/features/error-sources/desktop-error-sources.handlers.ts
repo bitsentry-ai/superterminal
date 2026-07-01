@@ -6,7 +6,6 @@ import { getErrorMessage } from '../../shared/errors'
 import { SqliteErrorSourcesRepositoryAdapter } from './desktop-sqlite-error-sources.adapter'
 import { SqliteErrorIssuesRepositoryAdapter } from './desktop-sqlite-error-issues.adapter'
 import { SqliteErrorEventsRepositoryAdapter } from './desktop-sqlite-error-events.adapter'
-import { ErrorSourceProviderFactory } from './desktop-error-source-provider.factory'
 import { ErrorSourceSyncService } from './desktop-error-source-sync.service'
 import { SyncSchedulerService } from './desktop-sync-scheduler.service'
 import type { DesktopOauthManagerService } from './desktop-oauth-manager'
@@ -113,7 +112,7 @@ const errorEventsListPayloadSchema = z.object({
 
 type DesktopOauthManagerServiceClass = new (
   db: DbClient,
-  providerFactory: ErrorSourceProviderFactory,
+  pluginRuntime?: DesktopPluginRuntimeService,
 ) => DesktopOauthManagerService
 
 let syncScheduler: SyncSchedulerService | null = null
@@ -666,14 +665,12 @@ export function createDesktopErrorSourcesHandlers(
   const eventsRepository = new SqliteErrorEventsRepositoryAdapter(db)
   const pluginRuntime =
     dependencies.pluginRuntime ?? createDesktopNodePluginRuntimeService()
-  const providerFactory = new ErrorSourceProviderFactory(pluginRuntime)
-  const oauthManager = new dependencies.OauthManagerService(db, providerFactory)
+  const oauthManager = new dependencies.OauthManagerService(db, pluginRuntime)
   const syncService = new ErrorSourceSyncService(
     db,
     sourcesRepository,
     issuesRepository,
     eventsRepository,
-    providerFactory,
     pluginRuntime,
   )
   const syncRecovery = recoverInterruptedSyncs(sourcesRepository)

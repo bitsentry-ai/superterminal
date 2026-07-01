@@ -375,12 +375,9 @@ export class ExternalSourceRunbookQueryService
 {
   constructor(
     private readonly sourcesRepository: DesktopExternalSourceSourcesRepository,
-    providerFactory: unknown,
     private readonly options?: { defaultLimit?: number },
     private readonly pluginRuntime: DesktopPluginRuntimeService = createDesktopNodePluginRuntimeService(),
-  ) {
-    void providerFactory;
-  }
+  ) {}
 
   async execute(input: ExternalSourceRunbookQueryInput): Promise<string> {
     const { sourceId, query } = readQueryInput(input);

@@ -4,16 +4,86 @@ import {
   refreshSourceAccessToken,
   type RefreshAccessTokenInput,
 } from '@bitsentry-ce/core/features/error-sources/desktop-oauth-token-refresher'
+import {
+  DesktopPluginRuntimeService,
+  type DesktopPluginDescriptor,
+  type DesktopPluginExecutionRequest,
+  type DesktopPluginExecutionResult,
+} from '@bitsentry-ce/core/features/plugins'
+
+function createOAuthPluginRuntime(input: {
+  pluginId: string
+  sourceType: 'github' | 'posthog'
+  oauth?: {
+    envClientIdName: string
+    envClientSecretName: string
+    publicClient: boolean
+  }
+  refreshResult?: Record<string, unknown>
+}): {
+  runtime: DesktopPluginRuntimeService
+  executeAction: ReturnType<typeof vi.fn>
+} {
+  const descriptor: DesktopPluginDescriptor = {
+    id: input.pluginId,
+    name: input.pluginId,
+    version: 'test',
+    description: `${input.pluginId} OAuth test plugin`,
+    metadata: {
+      errorSource: {
+        sourceType: input.sourceType,
+        oauth: input.oauth,
+        setupFields: [],
+      },
+    },
+    auth: {
+      fields: [],
+    },
+    actions: [
+      {
+        id: 'refresh_token',
+        title: 'Refresh token',
+        description: 'Refresh OAuth token',
+        riskLevel: 'read',
+        fields: [],
+      },
+    ],
+    triggers: [],
+  }
+  const executeAction = vi.fn(
+    (_request: DesktopPluginExecutionRequest): Promise<DesktopPluginExecutionResult> =>
+      Promise.resolve({
+        pluginId: input.pluginId,
+        actionId: 'refresh_token',
+        ok: true,
+        status: 200,
+        summary: 'Refreshed token',
+        data: input.refreshResult ?? {},
+      }),
+  )
+  const runtime = new (class TestPluginRuntimeService extends DesktopPluginRuntimeService {
+    listPlugins() {
+      return [descriptor]
+    }
+
+    getPlugin(pluginId: string) {
+      if (pluginId === input.pluginId) {
+        return descriptor
+      }
+
+      return null
+    }
+
+    executeAction(request: DesktopPluginExecutionRequest) {
+      return executeAction(request)
+    }
+  })()
+
+  return { runtime, executeAction }
+}
 
 describe('refreshSourceAccessToken', () => {
   it('uses stored OAuth tokens directly before deciding whether to refresh', async () => {
-    const getProvider = vi.fn(() => {
-      throw new Error('Provider should not be requested for a fresh stored token')
-    })
-    const providerFactory = {
-      getProvider,
-    }
-
     await expect(
       refreshSourceAccessToken({
         source: {
@@ -38,42 +108,27 @@ describe('refreshSourceAccessToken', () => {
         sourcesRepository: {
           update: vi.fn(),
         },
-        providerFactory,
       } satisfies RefreshAccessTokenInput),
     ).resolves.toBe('stored-access-token')
-
-    expect(getProvider).not.toHaveBeenCalled()
   })
 
   it('refreshes marketplace-style code plugin sources from plugin OAuth metadata', async () => {
-    const refreshToken = vi.fn().mockResolvedValue({
-      accessToken: 'refreshed-github-access-token',
-      refreshToken: 'refreshed-github-refresh-token',
-      expiresIn: 3600,
-      scope: 'repo read:org',
-    })
-    const provider = { refreshToken }
     const update = vi.fn().mockResolvedValue({})
-    const providerFactory = {
-      getProvider: vi.fn(() => provider),
-      getProviderForSource: vi.fn(() => provider),
-      getPlugin: vi.fn((pluginId: string) => {
-        if (pluginId !== 'github') return null
-
-        return {
-          metadata: {
-            errorSource: {
-              sourceType: 'github',
-              oauth: {
-                envClientIdName: 'GITHUB_OAUTH_CLIENT_ID',
-                envClientSecretName: 'GITHUB_OAUTH_CLIENT_SECRET',
-                publicClient: false,
-              },
-            },
-          },
-        }
-      }),
-    }
+    const { runtime, executeAction } = createOAuthPluginRuntime({
+      pluginId: 'github',
+      sourceType: 'github',
+      oauth: {
+        envClientIdName: 'GITHUB_OAUTH_CLIENT_ID',
+        envClientSecretName: 'GITHUB_OAUTH_CLIENT_SECRET',
+        publicClient: false,
+      },
+      refreshResult: {
+        accessToken: 'refreshed-github-access-token',
+        refreshToken: 'refreshed-github-refresh-token',
+        expiresIn: 3600,
+        scope: 'repo read:org',
+      },
+    })
 
     await expect(
       refreshSourceAccessToken({
@@ -96,25 +151,19 @@ describe('refreshSourceAccessToken', () => {
         sourcesRepository: {
           update,
         },
-        providerFactory,
+        pluginRuntime: runtime,
       } satisfies RefreshAccessTokenInput),
     ).resolves.toBe('refreshed-github-access-token')
 
-    expect(providerFactory.getProviderForSource).toHaveBeenCalledWith({
-      sourceType: 'github',
-      additionalMetadata: {
-        pluginId: 'github',
+    expect(executeAction).toHaveBeenCalledWith({
+      pluginId: 'github',
+      actionId: 'refresh_token',
+      auth: {},
+      input: {
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        refreshToken: 'stored-refresh-token',
       },
-      configuration: {
-        oauthClientId: 'client-id',
-        oauthClientSecret: 'client-secret',
-      },
-    })
-    expect(refreshToken).toHaveBeenCalledWith({
-      clientId: 'client-id',
-      clientSecret: 'client-secret',
-      refreshToken: 'stored-refresh-token',
-      signal: undefined,
     })
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -127,20 +176,10 @@ describe('refreshSourceAccessToken', () => {
   })
 
   it('does not fall back to host-owned OAuth refresh config', async () => {
-    const provider = {
-      refreshToken: vi.fn(),
-    }
-    const providerFactory = {
-      getProvider: vi.fn(() => provider),
-      getProviderForSource: vi.fn(() => provider),
-      getPlugin: vi.fn(() => ({
-        metadata: {
-          errorSource: {
-            sourceType: 'posthog',
-          },
-        },
-      })),
-    }
+    const { runtime, executeAction } = createOAuthPluginRuntime({
+      pluginId: 'posthog',
+      sourceType: 'posthog',
+    })
 
     await expect(
       refreshSourceAccessToken({
@@ -162,13 +201,12 @@ describe('refreshSourceAccessToken', () => {
         sourcesRepository: {
           update: vi.fn(),
         },
-        providerFactory,
+        pluginRuntime: runtime,
       } satisfies RefreshAccessTokenInput),
     ).rejects.toThrow(
       'OAuth refresh is not configured for source type: posthog',
     )
 
-    expect(providerFactory.getProviderForSource).not.toHaveBeenCalled()
-    expect(provider.refreshToken).not.toHaveBeenCalled()
+    expect(executeAction).not.toHaveBeenCalled()
   })
 })

@@ -14,7 +14,6 @@ import {
   SqliteRunbookResultStore,
   DEFAULT_RUNBOOK_EXECUTION_HEARTBEAT_GRACE_MS,
 } from '@bitsentry-ce/core/features/runbooks/desktop-runbook-result.store'
-import { ErrorSourceProviderFactory } from '@bitsentry-ce/core/features/error-sources/desktop-error-source-provider.factory'
 import {
   createDesktopAgentLlmAdapter,
   type AgentLlmCredentialsStore,
@@ -89,7 +88,6 @@ export function createDesktopEditionRunbookRuntime(
     GlobalVariablesService: DesktopGlobalVariablesService,
     RunbookStore,
     ErrorSourcesRepositoryAdapter: SqliteErrorSourcesRepositoryAdapter,
-    ErrorSourceProviderFactory,
     ExternalSourceRunbookQueryService,
     RunbookResultStore: SqliteRunbookResultStore,
     LocalAiProvider: CodingAgentsProviderService,

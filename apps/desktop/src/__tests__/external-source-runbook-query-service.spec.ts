@@ -238,11 +238,6 @@ describe('ExternalSourceRunbookQueryService code plugin queries', () => {
       findById: vi.fn().mockResolvedValue(source),
       update: vi.fn(),
     }
-    const providerFactory = {
-      getProvider: vi.fn(() => {
-        throw new Error('Sentry should not use a host-owned provider')
-      }),
-    }
     const pluginRuntime = new TestPluginRuntimeService([createSentryDescriptor()])
     pluginRuntime.executeActionMock.mockResolvedValue({
       pluginId: 'sentry',
@@ -258,7 +253,6 @@ describe('ExternalSourceRunbookQueryService code plugin queries', () => {
 
     const service = new ExternalSourceRunbookQueryService(
       sourcesRepository,
-      providerFactory,
       { defaultLimit: 3 },
       pluginRuntime,
     )
@@ -270,7 +264,6 @@ describe('ExternalSourceRunbookQueryService code plugin queries', () => {
       }),
     ).resolves.toContain('API is unhappy')
 
-    expect(providerFactory.getProvider).not.toHaveBeenCalled()
     const firstPluginCall = pluginRuntime.executeActionMock.mock.calls[0]
     if (firstPluginCall === undefined) {
       throw new Error('Expected Sentry runbook query to execute a plugin action')
@@ -305,11 +298,6 @@ describe('ExternalSourceRunbookQueryService code plugin queries', () => {
       findById: vi.fn().mockResolvedValue(source),
       update: vi.fn(),
     }
-    const providerFactory = {
-      getProvider: vi.fn(() => {
-        throw new Error('Wazuh should not use a host-owned provider')
-      }),
-    }
     const pluginRuntime = new TestPluginRuntimeService([createWazuhDescriptor()])
     pluginRuntime.executeActionMock.mockResolvedValue({
       pluginId: 'wazuh',
@@ -326,7 +314,6 @@ describe('ExternalSourceRunbookQueryService code plugin queries', () => {
 
     const service = new ExternalSourceRunbookQueryService(
       sourcesRepository,
-      providerFactory,
       { defaultLimit: 2 },
       pluginRuntime,
     )
@@ -338,7 +325,6 @@ describe('ExternalSourceRunbookQueryService code plugin queries', () => {
       }),
     ).resolves.toBe('Wazuh plugin output')
 
-    expect(providerFactory.getProvider).not.toHaveBeenCalled()
     const firstPluginCall = pluginRuntime.executeActionMock.mock.calls[0]
     if (firstPluginCall === undefined) {
       throw new Error('Expected Wazuh runbook query to execute a plugin action')

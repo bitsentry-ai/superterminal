@@ -3,7 +3,6 @@ import {
   SqliteErrorSourcesRepositoryAdapter,
   type ErrorSourceDatabase,
 } from '@bitsentry-ce/core/features/error-sources/desktop-sqlite-error-sources.adapter'
-import { ErrorSourceProviderFactory } from '@bitsentry-ce/core/features/error-sources'
 import { ErrorSourceSyncService } from '@bitsentry-ce/core/features/error-sources/desktop-error-source-sync.service'
 import type { UpsertErrorIssueInput } from '@bitsentry-ce/core/features/error-sources/desktop-sqlite-error-issues.adapter'
 import type { ErrorIssue, ErrorSource } from '@bitsentry-ce/core/features/error-sources/desktop-error-sources.types'
@@ -164,11 +163,6 @@ describe('Sentry external source sync', () => {
       updateSyncStatus: vi.fn().mockResolvedValue(undefined),
       update: vi.fn().mockResolvedValue(source),
     }
-    const providerFactory = {
-      getProvider: vi.fn(() => {
-        throw new Error('Legacy provider should not be used for source sync')
-      }),
-    }
     const service = new ErrorSourceSyncService(
       {
         $queryRawUnsafe: () => Promise.resolve([]),
@@ -189,14 +183,12 @@ describe('Sentry external source sync', () => {
         upsert: vi.fn(),
         findById: vi.fn(),
       },
-      providerFactory,
       new TestPluginRuntimeService([]),
     )
 
     await expect(service.syncSourceById(source.id)).rejects.toThrow(
       'Error source plugin "sentry" does not match source type sentry',
     )
-    expect(providerFactory.getProvider).not.toHaveBeenCalled()
     expect(sourcesRepository.update).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: source.id,
@@ -217,15 +209,19 @@ describe('Sentry external source sync', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const pluginDirectory = path.resolve(process.cwd(), '../../packages/plugins')
-    const provider = new ErrorSourceProviderFactory(
-      createDesktopNodePluginRuntimeService([pluginDirectory]),
-    ).getProvider('sentry')
-    await provider.listIssues({
-      accessToken: 'token',
-      orgSlug: 'jagad',
-      projectIds: ['4504367120777216'],
-      since: '2026-06-01T08:00:00.000Z',
-      limit: 20,
+    const pluginRuntime = createDesktopNodePluginRuntimeService([pluginDirectory])
+    await pluginRuntime.executeAction({
+      pluginId: 'sentry',
+      actionId: 'list_issues',
+      auth: {
+        accessToken: 'token',
+      },
+      input: {
+        orgSlug: 'jagad',
+        projectIds: ['4504367120777216'],
+        since: '2026-06-01T08:00:00.000Z',
+        limit: 20,
+      },
     })
 
     const url = String(fetchMock.mock.calls[0]?.[0] ?? '')
@@ -289,11 +285,6 @@ describe('Sentry external source sync', () => {
       updateSyncStatus: vi.fn().mockResolvedValue(undefined),
       update: vi.fn().mockResolvedValue(source),
     }
-    const providerFactory = {
-      getProvider: vi.fn(() => {
-        throw new Error('Legacy provider should not be used for plugin-backed sync')
-      }),
-    }
     const service = new ErrorSourceSyncService(
       {
         $queryRawUnsafe: () => Promise.resolve([]),
@@ -314,7 +305,6 @@ describe('Sentry external source sync', () => {
         upsert: vi.fn(),
         findById: vi.fn(),
       },
-      providerFactory,
       runtime,
     )
 
@@ -325,7 +315,6 @@ describe('Sentry external source sync', () => {
       syncedIssues: 0,
       syncedEvents: 0,
     })
-    expect(providerFactory.getProvider).not.toHaveBeenCalled()
     const executionRequest = runtime.executeActionMock.mock.calls[0]?.[0]
     expect(executionRequest).toMatchObject({
       pluginId: 'posthog',

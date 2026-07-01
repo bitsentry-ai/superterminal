@@ -1,7 +1,13 @@
 import { spawn } from "child_process";
 import { createHash, randomBytes } from "crypto";
 import type { ErrorSourceType } from "./error-sources.schemas";
-import { getProviderForSource } from "./desktop-plugin-provider-binding";
+import type { DesktopPluginRuntimeService } from "../plugins";
+import { createDesktopNodePluginRuntimeService } from "../plugins/node";
+import {
+  buildPluginAuthorizeUrl,
+  exchangePluginCodeForToken,
+  resolvePluginOAuthConfig,
+} from "./desktop-plugin-oauth-actions";
 
 export interface DesktopOAuthSettingsDatabase {
   setting: {
@@ -44,13 +50,6 @@ export interface DesktopOAuthTokenResponse {
   refreshToken?: string;
   expiresIn?: number;
   scope?: string;
-}
-
-export interface DesktopOAuthProvider {
-  buildAuthorizeUrl(input: DesktopOAuthAuthorizeInput): string | Promise<string>;
-  exchangeCodeForToken(
-    input: DesktopOAuthTokenExchangeInput,
-  ): Promise<DesktopOAuthTokenResponse>;
 }
 
 export interface InitiateOAuthInput {
@@ -240,137 +239,42 @@ async function openExternalUrl(url: string): Promise<void> {
   });
 }
 
-export interface DesktopOauthManagerOptions {
-  resolveProvider(input: {
-    sourceType: ErrorSourceType;
-    pluginId?: string;
-    providerBaseUrl?: string;
-  }): DesktopOAuthProvider;
-  resolvePluginDescriptor?: (
-    pluginId: string,
-  ) => {
-    metadata?: {
-      errorSource?: {
-        sourceType?: ErrorSourceType;
-        oauth?: Partial<OAuthProviderConfig>;
-      };
-    };
-  } | null;
-}
-
-export interface DesktopOauthManagerProviderFactory {
-  getProvider(sourceType: ErrorSourceType): DesktopOAuthProvider;
-  getProviderForSource?: (source: {
-    sourceType: ErrorSourceType;
-    additionalMetadata?: unknown;
-    configuration?: {
-      baseUrl?: unknown;
-    };
-  }) => DesktopOAuthProvider;
-  getPlugin?: (
-    pluginId: string,
-  ) => {
-    metadata?: {
-      errorSource?: {
-        sourceType?: ErrorSourceType;
-        oauth?: Partial<OAuthProviderConfig>;
-      };
-    };
-  } | null;
-}
-
 export interface DesktopOauthManagerBindings {
   OauthManagerService: new (
     db: DesktopOAuthSettingsDatabase,
-    providerFactory: DesktopOauthManagerProviderFactory,
+    pluginRuntime?: DesktopPluginRuntimeService,
   ) => DesktopOauthManagerService;
 }
 
 export function createDesktopOauthManagerBindings(): DesktopOauthManagerBindings {
   return {
-    OauthManagerService: class OauthManagerService extends DesktopOauthManagerService {
-      constructor(
-        db: DesktopOAuthSettingsDatabase,
-        providerFactory: DesktopOauthManagerProviderFactory,
-      ) {
-        const resolveSourceProvider = (input: {
-          sourceType: ErrorSourceType;
-          pluginId?: string;
-          providerBaseUrl?: string;
-        }): DesktopOAuthProvider => {
-          let additionalMetadata: { pluginId: string } | undefined;
-          if (input.pluginId !== undefined) {
-            additionalMetadata = { pluginId: input.pluginId };
-          }
-
-          return getProviderForSource(providerFactory, {
-            sourceType: input.sourceType,
-            additionalMetadata,
-            configuration: {
-              baseUrl: input.providerBaseUrl,
-            },
-          });
-        };
-
-        super(db, {
-          resolveProvider: resolveSourceProvider,
-          resolvePluginDescriptor: (pluginId) =>
-            providerFactory.getPlugin?.(pluginId) ?? null,
-        });
-      }
-    },
+    OauthManagerService: DesktopOauthManagerService,
   };
 }
 
 export class DesktopOauthManagerService {
   constructor(
     private readonly db: DesktopOAuthSettingsDatabase,
-    private readonly options: DesktopOauthManagerOptions,
+    private readonly pluginRuntime: DesktopPluginRuntimeService = createDesktopNodePluginRuntimeService(),
   ) {}
-
-  private getPluginProviderConfig(
-    sourceType: ErrorSourceType,
-    pluginId?: string,
-  ): Partial<OAuthProviderConfig> | undefined {
-    const normalizedPluginId = pluginId?.trim();
-    if (
-      normalizedPluginId === undefined ||
-      normalizedPluginId.length === 0 ||
-      this.options.resolvePluginDescriptor === undefined
-    ) {
-      return undefined;
-    }
-
-    const plugin = this.options.resolvePluginDescriptor(normalizedPluginId);
-    if (plugin?.metadata?.errorSource?.sourceType !== sourceType) {
-      return undefined;
-    }
-
-    return plugin.metadata.errorSource.oauth;
-  }
 
   private getProviderConfig(
     sourceType: ErrorSourceType,
     pluginId?: string,
-  ): OAuthProviderConfig {
-    const pluginConfig = this.getPluginProviderConfig(sourceType, pluginId);
-
-    return mergeOAuthProviderConfig({
-      sourceType,
-      pluginConfig,
-    });
-  }
-
-  private getProviderForOAuth(
-    sourceType: ErrorSourceType,
-    pluginId?: string,
-    providerBaseUrl?: string,
-  ): DesktopOAuthProvider {
-    return this.options.resolveProvider({
+  ): { config: OAuthProviderConfig; pluginId: string } {
+    const pluginConfig = resolvePluginOAuthConfig({
+      runtime: this.pluginRuntime,
       sourceType,
       pluginId,
-      providerBaseUrl,
     });
+
+    return {
+      pluginId: pluginConfig.pluginId,
+      config: mergeOAuthProviderConfig({
+        sourceType,
+        pluginConfig: pluginConfig.oauth,
+      }),
+    };
   }
 
   async initiateOAuth(
@@ -380,7 +284,10 @@ export class DesktopOauthManagerService {
     await this.pruneExpiredPendingStates();
 
     const pluginId = input?.pluginId?.trim() || undefined;
-    const config = this.getProviderConfig(sourceType, pluginId);
+    const { config, pluginId: resolvedPluginId } = this.getProviderConfig(
+      sourceType,
+      pluginId,
+    );
     let clientId = input?.clientId?.trim() ?? "";
     if (clientId.length === 0) {
       clientId = getRequiredEnv(config.envClientIdName, sourceType);
@@ -400,17 +307,18 @@ export class DesktopOauthManagerService {
     );
 
     const providerBaseUrl = readBaseUrl(input);
-    const provider = this.getProviderForOAuth(
+    const authUrl = await buildPluginAuthorizeUrl({
+      runtime: this.pluginRuntime,
       sourceType,
-      pluginId,
-      providerBaseUrl,
-    );
-    const authUrl = await provider.buildAuthorizeUrl({
-      clientId,
-      redirectUri,
-      scopes: config.scopes,
-      state,
-      codeChallenge,
+      pluginId: resolvedPluginId,
+      baseUrl: providerBaseUrl,
+      authorize: {
+        clientId,
+        redirectUri,
+        scopes: config.scopes,
+        state,
+        codeChallenge,
+      },
     });
 
     const record: PendingOauthState = {
@@ -476,7 +384,10 @@ export class DesktopOauthManagerService {
       }
 
       const effectivePluginId = pending.pluginId ?? requestedPluginId;
-      const config = this.getProviderConfig(sourceType, effectivePluginId);
+      const { config, pluginId: resolvedPluginId } = this.getProviderConfig(
+        sourceType,
+        effectivePluginId,
+      );
       const pendingBaseUrl = pending.providerBaseUrl;
       const requestedBaseUrl = readBaseUrl(input);
       if (
@@ -489,11 +400,6 @@ export class DesktopOauthManagerService {
         );
       }
       const providerBaseUrl = pendingBaseUrl ?? requestedBaseUrl;
-      const provider = this.getProviderForOAuth(
-        sourceType,
-        effectivePluginId,
-        providerBaseUrl,
-      );
       let clientId = input.clientId?.trim() ?? "";
       if (clientId.length === 0) {
         clientId = getRequiredEnv(config.envClientIdName, sourceType);
@@ -514,12 +420,18 @@ export class DesktopOauthManagerService {
         redirectUri = config.defaultRedirectUri;
       }
 
-      const tokens = await provider.exchangeCodeForToken({
-        clientId,
-        clientSecret,
-        code: input.code,
-        redirectUri,
-        codeVerifier: pending.codeVerifier,
+      const tokens = await exchangePluginCodeForToken({
+        runtime: this.pluginRuntime,
+        sourceType,
+        pluginId: resolvedPluginId,
+        baseUrl: providerBaseUrl,
+        exchange: {
+          clientId,
+          clientSecret,
+          code: input.code,
+          redirectUri,
+          codeVerifier: pending.codeVerifier,
+        },
       });
 
       if (tokens.accessToken.length === 0) {

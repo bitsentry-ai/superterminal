@@ -11,7 +11,6 @@ import type {
   ErrorSource,
   LogLevelThreshold,
 } from './desktop-error-sources.types'
-import type { ErrorSourceProvider } from './desktop-error-source-provider.interface'
 import {
   buildCompactExternalSourceEventFallback,
   buildCompactExternalSourceIssueFallback,
@@ -49,9 +48,6 @@ type ErrorSourcesRepository = Pick<
 >
 type ErrorIssuesRepository = Pick<SqliteErrorIssuesRepositoryAdapter, 'findById' | 'upsert'>
 type ErrorEventsRepository = Pick<SqliteErrorEventsRepositoryAdapter, 'findById' | 'upsert'>
-type ErrorSourceProviderRegistry = {
-  getProvider(sourceType: ErrorSource['sourceType']): ErrorSourceProvider
-}
 
 type DiagnosisIssueContext = Pick<
   ErrorIssue,
@@ -614,11 +610,8 @@ export class ErrorSourceSyncService {
     private readonly sourcesRepository: ErrorSourcesRepository,
     private readonly issuesRepository: ErrorIssuesRepository,
     private readonly eventsRepository: ErrorEventsRepository,
-    providerFactory: ErrorSourceProviderRegistry,
     private readonly pluginRuntime: DesktopPluginRuntimeService = createDesktopNodePluginRuntimeService(),
-  ) {
-    void providerFactory
-  }
+  ) {}
 
   async syncSourceById(sourceId: string): Promise<{ sourceId: string; syncedIssues: number; syncedEvents: number }> {
     const source = await this.sourcesRepository.findById(sourceId)

@@ -143,7 +143,6 @@ export interface DesktopEditionRunbookRuntimeBindings<
   TGlobalVariablesService,
   TRunbookStore,
   TErrorSourcesRepositoryAdapter,
-  TErrorSourceProviderFactory,
   TExternalSourceRunbookQueryService,
   TRunbookResultStore extends DesktopRunbookRuntimeResultStore,
   TLocalAiProvider extends DesktopRunbookRuntimeLocalAiProvider,
@@ -164,12 +163,8 @@ export interface DesktopEditionRunbookRuntimeBindings<
   ErrorSourcesRepositoryAdapter: new (
     db: TDb,
   ) => TErrorSourcesRepositoryAdapter;
-  ErrorSourceProviderFactory: new (
-    pluginRuntime?: DesktopPluginRuntimeService,
-  ) => TErrorSourceProviderFactory;
   ExternalSourceRunbookQueryService: new (
     sourcesRepository: TErrorSourcesRepositoryAdapter,
-    providerFactory: TErrorSourceProviderFactory,
     options?: { defaultLimit?: number },
     pluginRuntime?: DesktopPluginRuntimeService,
   ) => TExternalSourceRunbookQueryService;
@@ -246,7 +241,6 @@ export function createDesktopEditionRunbookRuntimeBindings<
   TGlobalVariablesService,
   TRunbookStore,
   TErrorSourcesRepositoryAdapter,
-  TErrorSourceProviderFactory,
   TExternalSourceRunbookQueryService,
   TRunbookResultStore extends DesktopRunbookRuntimeResultStore,
   TLocalAiProvider extends DesktopRunbookRuntimeLocalAiProvider,
@@ -259,7 +253,6 @@ export function createDesktopEditionRunbookRuntimeBindings<
     TGlobalVariablesService,
     TRunbookStore,
     TErrorSourcesRepositoryAdapter,
-    TErrorSourceProviderFactory,
     TExternalSourceRunbookQueryService,
     TRunbookResultStore,
     TLocalAiProvider,
@@ -313,7 +306,6 @@ export function createDesktopEditionRunbookRuntimeBindings<
       const runtime = getPluginRuntime();
       return new bindings.ExternalSourceRunbookQueryService(
         new bindings.ErrorSourcesRepositoryAdapter(db),
-        new bindings.ErrorSourceProviderFactory(runtime),
         undefined,
         runtime,
       );

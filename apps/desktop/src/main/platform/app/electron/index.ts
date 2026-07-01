@@ -67,7 +67,6 @@ import {
   unregisterCodingAgentsHandlers,
 } from '@bitsentry-ce/coding-agents/coding-agents.handlers'
 import type { LocalAiProviderKey } from '@bitsentry-ce/coding-agents'
-import { ErrorSourceProviderFactory } from '@bitsentry-ce/core/features/error-sources/desktop-error-source-provider.factory'
 import { ExternalSourceRunbookQueryService } from '@bitsentry-ce/core/features/error-sources'
 import { SqliteRunbookResultStore } from '@bitsentry-ce/core/features/runbooks/desktop-runbook-result.store'
 import { SqliteErrorSourcesRepositoryAdapter } from '@bitsentry-ce/core/features/error-sources/desktop-sqlite-error-sources.adapter'
@@ -399,7 +398,6 @@ app
       const runbookStore = new RunbookStore(db, globalVariablesService)
       const externalSourceRunbookQueryService = new ExternalSourceRunbookQueryService(
         new SqliteErrorSourcesRepositoryAdapter(db),
-        new ErrorSourceProviderFactory(),
       )
       const runbookResultStore = new SqliteRunbookResultStore(db)
       await runbookResultStore.markStaleRunningSessionsFailed()

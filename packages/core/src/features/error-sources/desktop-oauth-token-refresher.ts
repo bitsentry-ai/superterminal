@@ -6,7 +6,12 @@ import type {
   DesktopOAuthTokenResponse,
   OAuthProviderConfig,
 } from "./desktop-oauth-manager";
-import { getProviderForSource } from "./desktop-plugin-provider-binding";
+import type { DesktopPluginRuntimeService } from "../plugins";
+import { createDesktopNodePluginRuntimeService } from "../plugins/node";
+import {
+  refreshPluginAccessToken,
+  resolvePluginOAuthConfig,
+} from "./desktop-plugin-oauth-actions";
 
 type RefreshOAuthProviderConfig = Pick<
   OAuthProviderConfig,
@@ -19,15 +24,6 @@ type PluginOAuthProviderConfigOverride = Partial<
     "envClientIdName" | "envClientSecretName" | "publicClient"
   >
 >;
-
-type DesktopPluginMetadataLike = {
-  metadata?: {
-    errorSource?: {
-      sourceType?: ErrorSourceType;
-      oauth?: PluginOAuthProviderConfigOverride;
-    };
-  };
-};
 
 function readOptionalString(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -93,39 +89,20 @@ function mergeProviderConfig(input: {
   return merged as RefreshOAuthProviderConfig;
 }
 
-function readSourcePluginId(source: Pick<DesktopOAuthSource, "sourceType" | "additionalMetadata">): string {
-  const additionalMetadata = source.additionalMetadata;
-  if (
-    additionalMetadata === null ||
-    additionalMetadata === undefined ||
-    typeof additionalMetadata !== "object" ||
-    Array.isArray(additionalMetadata)
-  ) {
-    return source.sourceType;
-  }
-
-  const pluginId = (additionalMetadata as { pluginId?: unknown }).pluginId;
-  const normalizedPluginId = readOptionalString(pluginId);
-  if (normalizedPluginId !== null) {
-    return normalizedPluginId;
-  }
-
-  return source.sourceType;
-}
-
 function getPluginProviderConfigOverride(
   source: Pick<DesktopOAuthSource, "sourceType" | "additionalMetadata">,
-  providerFactory: {
-    getPlugin?: (pluginId: string) => DesktopPluginMetadataLike | null;
-  },
-): PluginOAuthProviderConfigOverride | undefined {
-  const pluginId = readSourcePluginId(source);
-  const plugin = providerFactory.getPlugin?.(pluginId);
-  if (plugin?.metadata?.errorSource?.sourceType !== source.sourceType) {
-    return undefined;
-  }
+  pluginRuntime: Pick<DesktopPluginRuntimeService, "getPlugin">,
+): { pluginId: string; oauth?: PluginOAuthProviderConfigOverride } {
+  const pluginConfig = resolvePluginOAuthConfig({
+    runtime: pluginRuntime,
+    sourceType: source.sourceType,
+    additionalMetadata: source.additionalMetadata,
+  });
 
-  return plugin.metadata.errorSource.oauth;
+  return {
+    pluginId: pluginConfig.pluginId,
+    oauth: pluginConfig.oauth,
+  };
 }
 
 function getExpiresAtMs(expiresAt: string | null): number {
@@ -229,32 +206,12 @@ export interface DesktopOAuthSourcesRepository {
   }): Promise<unknown>;
 }
 
-export interface DesktopOAuthRefreshProvider {
-  refreshToken(input: {
-    clientId: string;
-    clientSecret: string;
-    refreshToken: string;
-    signal?: AbortSignal;
-  }): Promise<DesktopOAuthTokenResponse>;
-}
-
 export interface RefreshAccessTokenInput<
   TSource extends DesktopOAuthSource = DesktopOAuthSource,
-  TProvider extends DesktopOAuthRefreshProvider = DesktopOAuthRefreshProvider,
 > {
   source: TSource;
   sourcesRepository: DesktopOAuthSourcesRepository;
-  providerFactory: {
-    getProvider(sourceType: TSource["sourceType"]): TProvider;
-    getProviderForSource?: (source: {
-      sourceType: TSource["sourceType"];
-      additionalMetadata?: unknown;
-      configuration?: {
-        baseUrl?: unknown;
-      };
-    }) => TProvider;
-    getPlugin?: (pluginId: string) => DesktopPluginMetadataLike | null;
-  };
+  pluginRuntime?: DesktopPluginRuntimeService;
   signal?: AbortSignal;
 }
 
@@ -303,8 +260,7 @@ function resolveWithoutRefreshToken(
  */
 export async function refreshSourceAccessToken<
   TSource extends DesktopOAuthSource,
-  TProvider extends DesktopOAuthRefreshProvider,
->(input: RefreshAccessTokenInput<TSource, TProvider>): Promise<string> {
+>(input: RefreshAccessTokenInput<TSource>): Promise<string> {
   const { source } = input;
   const accessToken = readOptionalString(source.accessTokenRef) ?? "";
 
@@ -334,25 +290,21 @@ export async function refreshSourceAccessToken<
 
 async function performTokenRefresh<
   TSource extends DesktopOAuthSource,
-  TProvider extends DesktopOAuthRefreshProvider,
 >(
-  input: RefreshAccessTokenInput<TSource, TProvider>,
+  input: RefreshAccessTokenInput<TSource>,
   refreshToken: string,
 ): Promise<string> {
-  const { source, sourcesRepository, providerFactory, signal } = input;
+  const { source, sourcesRepository, signal } = input;
+  const pluginRuntime =
+    input.pluginRuntime ?? createDesktopNodePluginRuntimeService();
   const config = source.configuration ?? {};
   const pluginConfigOverride = getPluginProviderConfigOverride(
     source,
-    providerFactory,
+    pluginRuntime,
   );
   const effectiveProviderConfig = mergeProviderConfig({
     sourceType: source.sourceType,
-    pluginOverride: pluginConfigOverride,
-  });
-  const provider = getProviderForSource(providerFactory, {
-    sourceType: source.sourceType,
-    additionalMetadata: source.additionalMetadata,
-    configuration: source.configuration,
+    pluginOverride: pluginConfigOverride.oauth,
   });
   const oauthClientId =
     readOptionalString(config.oauthClientId) ??
@@ -362,11 +314,17 @@ async function performTokenRefresh<
     config.oauthClientSecret,
   );
 
-  const refreshed = await provider.refreshToken({
-    clientId: oauthClientId,
-    clientSecret: oauthClientSecret,
-    refreshToken,
-    signal,
+  const refreshed = await refreshPluginAccessToken({
+    runtime: pluginRuntime,
+    sourceType: source.sourceType,
+    pluginId: pluginConfigOverride.pluginId,
+    baseUrl: readOptionalString(config.baseUrl) ?? undefined,
+    refresh: {
+      clientId: oauthClientId,
+      clientSecret: oauthClientSecret,
+      refreshToken,
+      signal,
+    },
   });
   const nextAccessToken = getNextAccessToken(refreshed.accessToken);
   const updated = await sourcesRepository.update({
