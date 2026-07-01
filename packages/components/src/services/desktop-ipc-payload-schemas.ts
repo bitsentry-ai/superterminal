@@ -112,7 +112,7 @@ export function createDesktopIpcPayloadValidator(
     needLabel: z.string().optional(),
     sourceId: z.string().optional(),
     sourceName: z.string().optional(),
-    sourceType: z.enum(["sentry", "wazuh", "posthog"]).optional(),
+    sourceType: z.string().trim().min(1).optional(),
     incidentThreadId: z.string().optional(),
   });
   const runbookIdleTimeoutSchema = z.number().int().min(0).max(1440);
@@ -189,6 +189,18 @@ export function createDesktopIpcPayloadValidator(
       z.object({
         id: idValueSchema,
         sortOrder: z.number().int().min(0).optional(),
+        type: z.literal("plugin"),
+        title: z.string(),
+        pluginId: z.string().min(1),
+        pluginActionId: z.string().min(1),
+        pluginInput: z.string().optional(),
+        pluginAuth: z.string().optional(),
+        parameters: z.array(runbookActionParameterSchema).optional(),
+        logFilter: config.logFilterConfigSchema.optional(),
+      }),
+      z.object({
+        id: idValueSchema,
+        sortOrder: z.number().int().min(0).optional(),
         type: z.literal("external_source"),
         title: z.string(),
         query: z.string().min(1),
@@ -240,18 +252,34 @@ export function createDesktopIpcPayloadValidator(
   });
 
   const schemaOverrides: Partial<Record<DesktopRpcChannel, z.ZodType>> = {
+    "plugins:get": z.object({
+      pluginId: z.string().min(1),
+    }),
+    "plugins:getStoredAuth": z.object({
+      pluginId: z.string().min(1),
+    }),
+    "plugins:updateStoredAuth": z.object({
+      pluginId: z.string().min(1),
+      auth: z.record(z.string(), z.unknown()),
+    }),
+    "plugins:clearStoredAuth": z.object({
+      pluginId: z.string().min(1),
+    }),
+    "plugins:installFromArchive": z.object({
+      archiveBase64: z.string().min(1),
+      installRoot: z.string().min(1).optional(),
+    }),
+    "plugins:execute": z.object({
+      pluginId: z.string().min(1),
+      actionId: z.string().min(1),
+      auth: z.record(z.string(), z.unknown()).optional(),
+      input: z.record(z.string(), z.unknown()).optional(),
+    }),
     "errorSources:create": z.object({
+      pluginId: z.string().min(1).optional(),
       sourceType: z.string().min(1),
       name: z.string().min(1),
-      authToken: z.string().min(1).optional(),
-      organizationSlug: z.string().min(1).optional(),
-      projectSlugs: z.array(z.string().min(1)).optional(),
-      sentryBaseUrl: z.url().optional(),
-      organizationId: z.string().min(1).optional(),
-      projectIds: z.array(z.string().min(1)).optional(),
-      baseUrl: z.url().optional(),
-      posthogBaseUrl: z.url().optional(),
-      indexPatterns: z.array(z.string().min(1)).optional(),
+      setupValues: z.record(z.string(), z.unknown()).optional(),
       configuration: z.record(z.string(), z.unknown()).optional(),
       additionalMetadata: z.record(z.string(), z.unknown()).optional(),
       logLevelThreshold: z
@@ -263,15 +291,9 @@ export function createDesktopIpcPayloadValidator(
     "errorSources:update": z.object({
       id: z.string().min(1),
       name: z.string().optional(),
+      setupValues: z.record(z.string(), z.unknown()).optional(),
       configuration: z.record(z.string(), z.unknown()).optional(),
       additionalMetadata: z.record(z.string(), z.unknown()).optional(),
-      organizationSlug: z.string().min(1).optional(),
-      organizationId: z.string().min(1).optional(),
-      projectSlugs: z.array(z.string().min(1)).optional(),
-      projectIds: z.array(z.string().min(1)).optional(),
-      sentryBaseUrl: z.url().optional(),
-      baseUrl: z.url().optional(),
-      posthogBaseUrl: z.url().optional(),
       logLevelThreshold: z
         .enum(["error", "warning", "info", "debug"])
         .optional(),
@@ -280,28 +302,24 @@ export function createDesktopIpcPayloadValidator(
     }),
     "errorSources:initiateOAuth": z
       .object({
+        pluginId: z.string().min(1).optional(),
         sourceType: z.string().min(1).optional(),
+        setupValues: z.record(z.string(), z.unknown()).optional(),
         clientId: z.string().min(1).optional(),
         redirectUri: z.string().min(1).optional(),
-        baseUrl: z.url().optional(),
-        posthogBaseUrl: z.url().optional(),
       })
       .optional()
       .default({}),
     "errorSources:completeOAuth": z.object({
+      pluginId: z.string().min(1).optional(),
       sourceType: z.string().min(1).optional(),
+      setupValues: z.record(z.string(), z.unknown()).optional(),
       code: z.string().min(1),
       state: z.string().min(1),
       clientId: z.string().min(1).optional(),
       clientSecret: z.string().min(1).optional(),
       redirectUri: z.string().min(1).optional(),
       name: z.string().optional(),
-      orgSlug: z.string().optional(),
-      organizationId: z.string().optional(),
-      projectSlugs: z.array(z.string()).optional(),
-      projectIds: z.array(z.string()).optional(),
-      baseUrl: z.url().optional(),
-      posthogBaseUrl: z.url().optional(),
       syncEnabled: z.boolean().optional(),
       autoDiagnosisEnabled: z.boolean().optional(),
     }),
@@ -309,12 +327,9 @@ export function createDesktopIpcPayloadValidator(
       id: z.string().min(1),
     }),
     "errorSources:probeConnection": z.object({
-      sourceType: z.enum(["sentry", "posthog"]),
-      authToken: z.string().min(1),
-      baseUrl: z.url().optional(),
-      posthogBaseUrl: z.url().optional(),
-      organizationSlug: z.string().min(1).optional(),
-      organizationId: z.string().min(1).optional(),
+      pluginId: z.string().min(1).optional(),
+      sourceType: z.string().min(1),
+      setupValues: z.record(z.string(), z.unknown()).optional(),
     }),
     "errorSources:triggerSync": z
       .object({
@@ -500,6 +515,7 @@ export function createDesktopIpcPayloadValidator(
   };
 
   const noPayloadChannels: DesktopRpcChannel[] = [
+    "plugins:list",
     "settings:getAll",
     "settings:getGeneral",
     "settings:getSecurity",

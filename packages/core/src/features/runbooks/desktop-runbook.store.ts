@@ -172,30 +172,6 @@ function normalizeStringArray(value: unknown): string[] {
   ].sort((left, right) => left.localeCompare(right));
 }
 
-function normalizeFingerprintBaseUrl(value: unknown): string | undefined {
-  const raw = asString(value).trim();
-  if (raw.length === 0) {
-    return undefined;
-  }
-
-  try {
-    const parsed = new URL(raw);
-    const pathname = parsed.pathname.replace(/\/+$/, "");
-    return `${parsed.origin.toLowerCase()}${pathname}`;
-  } catch {
-    return raw.replace(/\/+$/, "");
-  }
-}
-
-function normalizeFingerprintSlug(value: unknown): string | undefined {
-  const raw = asString(value).trim();
-  if (raw.length === 0) {
-    return undefined;
-  }
-
-  return raw.toLowerCase();
-}
-
 function toArtifactRefSlug(value: string): string {
   return value
     .trim()
@@ -243,33 +219,7 @@ function buildExternalSourceFingerprint(
   configuration: unknown,
 ): string {
   const config = sanitizeExportedErrorSourceConfiguration(configuration);
-
-  switch (sourceType) {
-    case "sentry":
-      return `sentry::${stableSerialize({
-        orgSlug: normalizeFingerprintSlug(config.orgSlug),
-        sentryBaseUrl: normalizeFingerprintBaseUrl(config.sentryBaseUrl),
-        projectIds: normalizeStringArray(config.projectIds),
-        projectSlugs: normalizeStringArray(config.projectSlugs),
-      })}`;
-    case "posthog":
-      return `posthog::${stableSerialize({
-        orgSlug: normalizeFingerprintSlug(config.orgSlug),
-        posthogBaseUrl: normalizeFingerprintBaseUrl(config.posthogBaseUrl),
-        projectIds: normalizeStringArray(config.projectIds),
-      })}`;
-    case "wazuh":
-      return `wazuh::${stableSerialize({
-        baseUrl: normalizeFingerprintBaseUrl(config.baseUrl),
-        indexPatterns: normalizeStringArray(config.indexPatterns),
-      })}`;
-    default:
-      return `${sourceType}::${stableSerialize(config)}`;
-  }
-}
-
-function requiresExternalSourceAuthToken(sourceType: string): boolean {
-  return sourceType === "sentry" || sourceType === "posthog";
+  return `${sourceType}::${stableSerialize(config)}`;
 }
 
 function normalizeExportedExternalSourceCredentials(value: unknown): {
@@ -375,6 +325,10 @@ function normalizeRunbookActionFingerprint(
     method?: RunbookHttpMethod;
     headers?: RunbookHttpHeader[];
     body?: string;
+    pluginId?: string;
+    pluginActionId?: string;
+    pluginInput?: string;
+    pluginAuth?: string;
     query?: string;
     sourceId?: string;
     sourceRef?: string;
@@ -436,6 +390,15 @@ function normalizeRunbookActionFingerprint(
       }
 
       return fingerprint;
+    }
+    case "plugin": {
+      return {
+        ...shared,
+        pluginId: action.pluginId ?? "",
+        pluginActionId: action.pluginActionId ?? "",
+        pluginAuth: action.pluginAuth ?? "",
+        pluginInput: action.pluginInput ?? "",
+      };
     }
     case "external_source": {
       const sourceId = action.sourceId?.trim();
@@ -833,6 +796,10 @@ function parseTelemetryConfig(
 function serializeRunbookActionBody(
   action: DesktopRunbookActionRecord,
 ): string | null {
+  if (action.type === "plugin") {
+    return action.pluginInput ?? null;
+  }
+
   if (isTelemetryActionType(action.type)) {
     if (action.telemetryConfig !== undefined) {
       return JSON.stringify(action.telemetryConfig);
@@ -844,11 +811,42 @@ function serializeRunbookActionBody(
   return action.body ?? null;
 }
 
+function serializeStoredRunbookActionUrl(
+  action: DesktopRunbookActionRecord,
+): string | null {
+  if (action.type === "plugin") {
+    return action.pluginAuth ?? null;
+  }
+
+  return action.url ?? null;
+}
+
+function serializeStoredRunbookActionQuery(
+  action: DesktopRunbookActionRecord,
+): string | null {
+  if (action.type === "plugin") {
+    return action.pluginActionId ?? null;
+  }
+
+  return action.query ?? null;
+}
+
+function serializeStoredRunbookActionSourceId(
+  action: DesktopRunbookActionRecord,
+): string | null {
+  if (action.type === "plugin") {
+    return action.pluginId ?? null;
+  }
+
+  return action.sourceId ?? null;
+}
+
 function createEmptyActionTypeCounts(): DesktopRunbookContext["summary"]["actionTypeCounts"] {
   return {
     shell: 0,
     llm: 0,
     http: 0,
+    plugin: 0,
     external_source: 0,
     telemetry_existing_entry: 0,
     data_source_query: 0,
@@ -916,6 +914,21 @@ function sanitizeRunbookAction(
       }
       return sanitized;
     }
+    case "plugin": {
+      if (typeof action.pluginId === "string") {
+        sanitized.pluginId = action.pluginId;
+      }
+      if (typeof action.pluginActionId === "string") {
+        sanitized.pluginActionId = action.pluginActionId;
+      }
+      if (typeof action.pluginInput === "string") {
+        sanitized.pluginInput = action.pluginInput;
+      }
+      if (typeof action.pluginAuth === "string") {
+        sanitized.pluginAuth = action.pluginAuth;
+      }
+      return sanitized;
+    }
     case "external_source": {
       if (typeof action.query === "string") {
         sanitized.query = action.query;
@@ -965,6 +978,18 @@ function assertValidAction(action: DesktopRunbookActionRecord): void {
       throw new Error("External Source action is missing a source selection");
     }
   }
+
+  if (action.type === "plugin") {
+    if (action.pluginId === undefined || action.pluginId.trim().length === 0) {
+      throw new Error("Plugin action is missing a selected plugin");
+    }
+    if (
+      action.pluginActionId === undefined ||
+      action.pluginActionId.trim().length === 0
+    ) {
+      throw new Error("Plugin action is missing a selected plugin action");
+    }
+  }
 }
 
 function parseIncomingRunbookAction(
@@ -985,6 +1010,10 @@ function parseIncomingRunbookAction(
     method: parseRunbookHttpMethod(action.method),
     headers: normalizeRunbookHeaders(action.headers),
     body: asOptionalString(action.body),
+    pluginId: asOptionalString(action.pluginId),
+    pluginActionId: asOptionalString(action.pluginActionId),
+    pluginInput: asOptionalString(action.pluginInput),
+    pluginAuth: asOptionalString(action.pluginAuth),
     query: asOptionalString(action.query),
     sourceId: asOptionalString(action.sourceId),
     parameters: normalizeRunbookParameters(action.parameters),
@@ -1001,6 +1030,26 @@ function parseIncomingRunbookAction(
 
 function toRunbookAction(raw: Record<string, unknown>): DesktopRunbookActionRecord {
   const type = normalizeRunbookActionType(raw.type);
+  const isPluginAction = type === "plugin";
+  let url = asOptionalString(raw.url);
+  let body = asOptionalString(raw.body);
+  let pluginId: string | undefined;
+  let pluginActionId: string | undefined;
+  let pluginInput: string | undefined;
+  let pluginAuth: string | undefined;
+  let query = asOptionalString(raw.query);
+  let sourceId = asOptionalString(raw.sourceId);
+  if (isPluginAction) {
+    url = undefined;
+    body = undefined;
+    pluginId = asOptionalString(raw.sourceId);
+    pluginActionId = asOptionalString(raw.query);
+    pluginInput = asOptionalString(raw.body);
+    pluginAuth = asOptionalString(raw.url);
+    query = undefined;
+    sourceId = undefined;
+  }
+
   return sanitizeRunbookAction({
     id: asString(raw.id),
     type,
@@ -1009,12 +1058,16 @@ function toRunbookAction(raw: Record<string, unknown>): DesktopRunbookActionReco
     prompt: asOptionalString(raw.prompt),
     llmProviderKey: parseRunbookLlmProviderKey(raw.llmProviderKey),
     llmModel: asOptionalString(raw.llmModel),
-    url: asOptionalString(raw.url),
+    url,
     method: parseRunbookHttpMethod(raw.method),
     headers: parseRunbookHeaders(raw.headersJson ?? raw.headers),
-    body: asOptionalString(raw.body),
-    query: asOptionalString(raw.query),
-    sourceId: asOptionalString(raw.sourceId),
+    body,
+    pluginId,
+    pluginActionId,
+    pluginInput,
+    pluginAuth,
+    query,
+    sourceId,
     parameters: parseRunbookParameters(raw.parametersJson ?? raw.parameters),
     logFilter: parseRunbookLogFilter(raw.logFilterJson ?? raw.logFilter),
     telemetryConfig: parseTelemetryConfig(
@@ -1067,6 +1120,24 @@ function actionPayload(
       }
       if (typeof action.body === "string") {
         payload.body = action.body;
+      }
+      return payload;
+    }
+    case "plugin": {
+      if (action.pluginId !== undefined && action.pluginId.length > 0) {
+        payload.pluginId = action.pluginId;
+      }
+      if (
+        action.pluginActionId !== undefined &&
+        action.pluginActionId.length > 0
+      ) {
+        payload.pluginActionId = action.pluginActionId;
+      }
+      if (typeof action.pluginAuth === "string") {
+        payload.pluginAuth = action.pluginAuth;
+      }
+      if (typeof action.pluginInput === "string") {
+        payload.pluginInput = action.pluginInput;
       }
       return payload;
     }
@@ -1356,12 +1427,12 @@ export class DesktopRunbookStore {
             prompt: action.prompt ?? null,
             llmProviderKey: action.llmProviderKey ?? null,
             llmModel: action.llmModel ?? null,
-            url: action.url ?? null,
+            url: serializeStoredRunbookActionUrl(action),
             method: action.method ?? null,
             headersJson,
             body: serializeRunbookActionBody(action),
-            query: action.query ?? null,
-            sourceId: action.sourceId ?? null,
+            query: serializeStoredRunbookActionQuery(action),
+            sourceId: serializeStoredRunbookActionSourceId(action),
             parametersJson,
             logFilterJson,
             createdAt: now,
@@ -1407,12 +1478,12 @@ export class DesktopRunbookStore {
           prompt: nextAction.prompt ?? null,
           llmProviderKey: nextAction.llmProviderKey ?? null,
           llmModel: nextAction.llmModel ?? null,
-          url: nextAction.url ?? null,
+          url: serializeStoredRunbookActionUrl(nextAction),
           method: nextAction.method ?? null,
           headersJson: serializeOptionalJson(nextAction.headers),
           body: serializeRunbookActionBody(nextAction),
-          query: nextAction.query ?? null,
-          sourceId: nextAction.sourceId ?? null,
+          query: serializeStoredRunbookActionQuery(nextAction),
+          sourceId: serializeStoredRunbookActionSourceId(nextAction),
           parametersJson: serializeOptionalJson(nextAction.parameters),
           logFilterJson: serializeOptionalJson(nextAction.logFilter),
           updatedAt: now,
@@ -1457,12 +1528,12 @@ export class DesktopRunbookStore {
         prompt: nextAction.prompt ?? null,
         llmProviderKey: nextAction.llmProviderKey ?? null,
         llmModel: nextAction.llmModel ?? null,
-        url: nextAction.url ?? null,
+        url: serializeStoredRunbookActionUrl(nextAction),
         method: nextAction.method ?? null,
         headersJson: serializeOptionalJson(nextAction.headers),
         body: serializeRunbookActionBody(nextAction),
-        query: nextAction.query ?? null,
-        sourceId: nextAction.sourceId ?? null,
+        query: serializeStoredRunbookActionQuery(nextAction),
+        sourceId: serializeStoredRunbookActionSourceId(nextAction),
         parametersJson: serializeOptionalJson(nextAction.parameters),
         logFilterJson: serializeOptionalJson(nextAction.logFilter),
         createdAt: now,
@@ -1634,6 +1705,10 @@ export class DesktopRunbookStore {
             method: action.method,
             headers: action.headers,
             body: action.body,
+            pluginId: action.pluginId,
+            pluginActionId: action.pluginActionId,
+            pluginInput: action.pluginInput,
+            pluginAuth: action.pluginAuth,
             query: action.query,
             sourceRef,
             sourceName,
@@ -2015,11 +2090,18 @@ export class DesktopRunbookStore {
 
           const normalizedParameters = normalizeRunbookParameters(action.parameters);
           let body = action.body ?? null;
+          let url = action.url ?? null;
+          let query = action.query ?? null;
           if (isTelemetryActionType(action.type) && action.telemetryConfig !== undefined) {
             body = JSON.stringify(action.telemetryConfig);
           }
           let sourceId: string | null = null;
-          if (action.sourceRef !== undefined && action.sourceRef.length > 0) {
+          if (action.type === "plugin") {
+            body = action.pluginInput ?? null;
+            url = action.pluginAuth ?? null;
+            query = action.pluginActionId ?? null;
+            sourceId = action.pluginId ?? null;
+          } else if (action.sourceRef !== undefined && action.sourceRef.length > 0) {
             sourceId = importedExternalSources.sourceIdByRef.get(action.sourceRef) ?? null;
           }
 
@@ -2034,11 +2116,11 @@ export class DesktopRunbookStore {
               prompt: action.prompt ?? null,
               llmProviderKey: action.llmProviderKey ?? null,
               llmModel: action.llmModel ?? null,
-              url: action.url ?? null,
+              url,
               method: action.method ?? null,
               headersJson: serializeOptionalJson(action.headers),
               body,
-              query: action.query ?? null,
+              query,
               sourceId,
               parametersJson: serializeOptionalJson(normalizedParameters),
               logFilterJson: serializeOptionalJson(action.logFilter),
@@ -2187,13 +2269,16 @@ export class DesktopRunbookStore {
         };
 
         if (
-          requiresExternalSourceAuthToken(source.sourceType) ||
           hasAccessTokenRef ||
-          hasRefreshTokenRef
+          hasRefreshTokenRef ||
+          source.expiresAt !== null ||
+          source.grantedScopes.length > 0
         ) {
           const credentials: NonNullable<typeof exportedSource.credentials> = {
-            authToken: "",
           };
+          if (hasAccessTokenRef) {
+            credentials.authToken = "";
+          }
           if (hasRefreshTokenRef) {
             credentials.refreshToken = "";
           }
@@ -2257,15 +2342,6 @@ export class DesktopRunbookStore {
       const credentials = normalizeExportedExternalSourceCredentials(
         externalSource.credentials,
       );
-
-      if (
-        requiresExternalSourceAuthToken(externalSource.sourceType) &&
-        credentials.authToken === undefined
-      ) {
-        throw new Error(
-          `External source "${externalSource.name}" does not match an existing local source and is missing authToken in the import YAML.`,
-        );
-      }
 
       if (options?.dryRun === true) {
         sourceIdByRef.set(externalSource.ref, externalSource.ref);

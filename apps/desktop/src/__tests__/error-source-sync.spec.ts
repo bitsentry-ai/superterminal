@@ -3,11 +3,87 @@ import {
   SqliteErrorSourcesRepositoryAdapter,
   type ErrorSourceDatabase,
 } from '@bitsentry-ce/core/features/error-sources/desktop-sqlite-error-sources.adapter'
-import { SentryProviderAdapter } from '@bitsentry-ce/core/features/error-sources/desktop-sentry-provider.adapter'
 import { ErrorSourceSyncService } from '@bitsentry-ce/core/features/error-sources/desktop-error-source-sync.service'
-import type { ErrorSourceProvider } from '@bitsentry-ce/core/features/error-sources/desktop-error-source-provider.interface'
 import type { UpsertErrorIssueInput } from '@bitsentry-ce/core/features/error-sources/desktop-sqlite-error-issues.adapter'
 import type { ErrorIssue, ErrorSource } from '@bitsentry-ce/core/features/error-sources/desktop-error-sources.types'
+import {
+  DesktopPluginRuntimeService,
+  type DesktopPluginDescriptor,
+  type DesktopPluginExecutionRequest,
+  type DesktopPluginExecutionResult,
+} from '@bitsentry-ce/core/features/plugins'
+import { createDesktopNodePluginRuntimeService } from '@bitsentry-ce/core/features/plugins/node'
+import path from 'path'
+
+class TestPluginRuntimeService extends DesktopPluginRuntimeService {
+  readonly executeActionMock = vi.fn<
+    (input: DesktopPluginExecutionRequest) => Promise<DesktopPluginExecutionResult>
+  >()
+
+  constructor(private readonly descriptors: DesktopPluginDescriptor[]) {
+    super()
+  }
+
+  override listPlugins(): DesktopPluginDescriptor[] {
+    return this.descriptors
+  }
+
+  override getPlugin(pluginId: string): DesktopPluginDescriptor | null {
+    return this.descriptors.find((plugin) => plugin.id === pluginId) ?? null
+  }
+
+  override executeAction(
+    input: DesktopPluginExecutionRequest,
+  ): Promise<DesktopPluginExecutionResult> {
+    return this.executeActionMock(input)
+  }
+}
+
+function createProviderAction(
+  id: string,
+): DesktopPluginDescriptor['actions'][number] {
+  return {
+    id,
+    title: id,
+    description: `${id} action.`,
+    riskLevel: 'read',
+    fields: [],
+  }
+}
+
+function createPostHogPluginDescriptor(): DesktopPluginDescriptor {
+  return {
+    id: 'posthog',
+    name: 'PostHog',
+    version: '1.0.0',
+    description: 'PostHog code plugin.',
+    metadata: {
+      errorSource: {
+        sourceType: 'posthog',
+        setupFields: [
+          {
+            key: 'accessToken',
+            label: 'API key',
+            required: true,
+            control: 'password',
+          },
+        ],
+      },
+    },
+    auth: {
+      fields: [
+        {
+          key: 'accessToken',
+          label: 'API key',
+          type: 'string',
+          required: true,
+        },
+      ],
+    },
+    actions: [createProviderAction('list_issues')],
+    triggers: [],
+  }
+}
 
 function makeSource(overrides: Partial<ErrorSource> = {}): ErrorSource {
   return {
@@ -79,38 +155,8 @@ describe('Sentry external source sync', () => {
     vi.restoreAllMocks()
   })
 
-  it('bounds the first Sentry sync to a latest snapshot instead of walking full event history', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-06-01T09:00:00.000Z'))
-
+  it('requires sync to run through a matching code plugin', async () => {
     const source = makeSource()
-    const issues = Array.from({ length: 20 }, (_, index) => ({
-      id: `issue-${String(index + 1)}`,
-      title: `Issue ${String(index + 1)}`,
-      level: 'error',
-      count: 1,
-      firstSeen: '2026-06-01T08:00:00.000Z',
-      lastSeen: '2026-06-01T08:00:00.000Z',
-    }))
-    const provider = {
-      sourceType: 'sentry',
-      buildAuthorizeUrl: vi.fn(),
-      exchangeCodeForToken: vi.fn(),
-      refreshToken: vi.fn(),
-      listOrganizations: vi.fn(),
-      listProjects: vi.fn(),
-      queryIssues: vi.fn(),
-      listIssues: vi.fn().mockResolvedValue({
-        issues,
-        hasMore: true,
-        nextCursor: 'next-issues',
-      }),
-      listIssueEvents: vi.fn().mockResolvedValue({
-        events: [],
-        hasMore: true,
-        nextCursor: 'next-events',
-      }),
-    } satisfies ErrorSourceProvider
     const sourcesRepository = {
       findById: vi.fn().mockResolvedValue(source),
       findSyncEnabled: vi.fn().mockResolvedValue([source]),
@@ -137,32 +183,18 @@ describe('Sentry external source sync', () => {
         upsert: vi.fn(),
         findById: vi.fn(),
       },
-      {
-        getProvider: vi.fn(() => provider),
-      },
+      new TestPluginRuntimeService([]),
     )
 
-    const result = await service.syncSourceById(source.id)
-
-    expect(result).toEqual({
-      sourceId: source.id,
-      syncedIssues: 20,
-      syncedEvents: 0,
-    })
-    expect(provider.listIssues).toHaveBeenCalledTimes(1)
-    expect(provider.listIssues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        limit: 20,
-        since: '2026-05-25T09:00:00.000Z',
-      }),
+    await expect(service.syncSourceById(source.id)).rejects.toThrow(
+      'Error source plugin "sentry" does not match source type sentry',
     )
-    expect(provider.listIssueEvents).toHaveBeenCalledTimes(20)
     expect(sourcesRepository.update).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: source.id,
-        lastSyncStatus: 'success',
-        lastSyncError: null,
-        lastSyncAt: '2026-06-01T09:00:00.000Z',
+        lastSyncStatus: 'failed',
+        lastSyncError:
+          'Error source plugin "sentry" does not match source type sentry',
       }),
     )
   })
@@ -176,13 +208,20 @@ describe('Sentry external source sync', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const provider = new SentryProviderAdapter()
-    await provider.listIssues({
-      accessToken: 'token',
-      orgSlug: 'jagad',
-      projectIds: ['4504367120777216'],
-      since: '2026-06-01T08:00:00.000Z',
-      limit: 20,
+    const pluginDirectory = path.resolve(process.cwd(), '../../packages/plugins')
+    const pluginRuntime = createDesktopNodePluginRuntimeService([pluginDirectory])
+    await pluginRuntime.executeAction({
+      pluginId: 'sentry',
+      actionId: 'list_issues',
+      auth: {
+        accessToken: 'token',
+      },
+      input: {
+        orgSlug: 'jagad',
+        projectIds: ['4504367120777216'],
+        since: '2026-06-01T08:00:00.000Z',
+        limit: 20,
+      },
     })
 
     const url = String(fetchMock.mock.calls[0]?.[0] ?? '')
@@ -216,5 +255,91 @@ describe('Sentry external source sync', () => {
         lastSyncError: 'Previous sync was interrupted before completion.',
       },
     })
+  })
+
+  it('syncs legacy-named sources through matching code plugin actions', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T09:00:00.000Z'))
+
+    const source = makeSource({
+      id: 'source-posthog',
+      sourceType: 'posthog',
+      name: 'Production PostHog',
+      additionalMetadata: { pluginId: 'posthog' },
+    })
+    const runtime = new TestPluginRuntimeService([createPostHogPluginDescriptor()])
+    runtime.executeActionMock.mockResolvedValue({
+      pluginId: 'posthog',
+      actionId: 'list_issues',
+      ok: true,
+      status: 200,
+      summary: 'Listed PostHog issues.',
+      data: {
+        issues: [],
+        hasMore: false,
+      },
+    })
+    const sourcesRepository = {
+      findById: vi.fn().mockResolvedValue(source),
+      findSyncEnabled: vi.fn().mockResolvedValue([source]),
+      updateSyncStatus: vi.fn().mockResolvedValue(undefined),
+      update: vi.fn().mockResolvedValue(source),
+    }
+    const service = new ErrorSourceSyncService(
+      {
+        $queryRawUnsafe: () => Promise.resolve([]),
+        telemetryDaily: { upsert: vi.fn() },
+        telemetryEntry: {
+          findUnique: vi.fn(),
+          create: vi.fn(),
+        },
+        diagnosisEntry: { upsert: vi.fn() },
+        diagnosisEntrySourceRef: { upsert: vi.fn() },
+      },
+      sourcesRepository,
+      {
+        upsert: vi.fn((input: UpsertErrorIssueInput) => Promise.resolve(makeIssue(input))),
+        findById: vi.fn(),
+      },
+      {
+        upsert: vi.fn(),
+        findById: vi.fn(),
+      },
+      runtime,
+    )
+
+    const result = await service.syncSourceById(source.id)
+
+    expect(result).toEqual({
+      sourceId: source.id,
+      syncedIssues: 0,
+      syncedEvents: 0,
+    })
+    const executionRequest = runtime.executeActionMock.mock.calls[0]?.[0]
+    expect(executionRequest).toMatchObject({
+      pluginId: 'posthog',
+      actionId: 'list_issues',
+      auth: {
+        accessToken: 'token',
+      },
+    })
+    expect(executionRequest?.input).toMatchObject({
+      sourceId: source.id,
+      sourceName: 'Production PostHog',
+      sourceType: 'posthog',
+      orgSlug: 'jagad',
+      projectIds: ['4504367120777216'],
+      query: '*',
+      limit: 100,
+      until: '2026-06-01T09:00:00.000Z',
+    })
+    expect(sourcesRepository.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: source.id,
+        lastSyncStatus: 'success',
+        lastSyncError: null,
+        lastSyncAt: '2026-06-01T09:00:00.000Z',
+      }),
+    )
   })
 })

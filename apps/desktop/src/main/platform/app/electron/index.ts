@@ -67,7 +67,6 @@ import {
   unregisterCodingAgentsHandlers,
 } from '@bitsentry-ce/coding-agents/coding-agents.handlers'
 import type { LocalAiProviderKey } from '@bitsentry-ce/coding-agents'
-import { ErrorSourceProviderFactory } from '@bitsentry-ce/core/features/error-sources/desktop-error-source-provider.factory'
 import { ExternalSourceRunbookQueryService } from '@bitsentry-ce/core/features/error-sources'
 import { SqliteRunbookResultStore } from '@bitsentry-ce/core/features/runbooks/desktop-runbook-result.store'
 import { SqliteErrorSourcesRepositoryAdapter } from '@bitsentry-ce/core/features/error-sources/desktop-sqlite-error-sources.adapter'
@@ -399,7 +398,6 @@ app
       const runbookStore = new RunbookStore(db, globalVariablesService)
       const externalSourceRunbookQueryService = new ExternalSourceRunbookQueryService(
         new SqliteErrorSourcesRepositoryAdapter(db),
-        new ErrorSourceProviderFactory(),
       )
       const runbookResultStore = new SqliteRunbookResultStore(db)
       await runbookResultStore.markStaleRunningSessionsFailed()
@@ -484,7 +482,7 @@ app
       // Renderer init gate: only true when both the user has opted in AND the
       // main process actually has a DSN configured. Without a DSN, main never
       // initializes the Sentry main client, so the renderer SDK can't reach it
-      // (manifests as "sentry-ipc://" CSP errors or "scheme not supported").
+      // (appears as "sentry-ipc://" CSP errors or "scheme not supported").
       ipcMain.handle('bitsentry:sentry:rendererShouldInit', async () => {
         if (!hasSentryDsn()) return false
         return isSentryEnabled(db)

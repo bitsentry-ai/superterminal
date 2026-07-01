@@ -16,7 +16,7 @@ import Navbar from "../../layout/Navbar";
 import TopBar from "../../layout/TopBar";
 import { cn } from "../../lib/utils";
 
-const providerCards = ["Sentry", "Wazuh", "PostHog"];
+const providerCards = ["GitHub Issues", "Error Events", "Alert Index"];
 const actionTypes = [
   { id: "shell", label: "Shell", icon: Terminal },
   { id: "llm", label: "AI", icon: Bot },
@@ -66,7 +66,7 @@ export default function TourDataSourcesPreview() {
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {providerCards.map((provider) => {
-                      const selected = provider === "Sentry";
+                      const selected = provider === "GitHub Issues";
                       let cardClassName = "border-border bg-card";
                       let iconClassName = "text-muted-foreground";
                       if (selected) {
@@ -98,7 +98,7 @@ export default function TourDataSourcesPreview() {
                     <span className="text-sm text-muted-foreground">Name</span>
                     <input
                       readOnly
-                      value="Production Sentry"
+                      value="Production GitHub Issues"
                       className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                     />
                   </label>
@@ -120,17 +120,17 @@ export default function TourDataSourcesPreview() {
                       </span>
                       <input
                         readOnly
-                        value="bitsentry"
+                        value="bitsentry-ai"
                         className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                       />
                     </label>
                     <label className="block space-y-1">
                       <span className="text-sm text-muted-foreground">
-                        Projects
+                        Repositories
                       </span>
                       <input
                         readOnly
-                        value="api, worker"
+                        value="monorepo, runbooks"
                         className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                       />
                     </label>
@@ -205,7 +205,7 @@ export default function TourDataSourcesPreview() {
                       External Source
                     </span>
                     <select className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs">
-                      <option>Production Sentry (sentry)</option>
+                      <option>Production GitHub Issues (github)</option>
                     </select>
                     <p className="text-[11px] text-muted-foreground">
                       Connected sources from Settings appear here.
