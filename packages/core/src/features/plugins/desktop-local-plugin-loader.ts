@@ -75,9 +75,15 @@ function collectPluginEntryPaths(directory: string): string[] {
     }
 
     if (entry.isDirectory()) {
-      const pluginEntryPath = path.join(directory, entry.name, "plugin.js");
-      if (fs.existsSync(pluginEntryPath)) {
-        pluginEntries.push(pluginEntryPath);
+      const candidateEntryPaths = [
+        path.join(directory, entry.name, "plugin.js"),
+        path.join(directory, entry.name, "dist", "plugin.js"),
+      ];
+      for (const pluginEntryPath of candidateEntryPaths) {
+        if (fs.existsSync(pluginEntryPath)) {
+          pluginEntries.push(pluginEntryPath);
+          break;
+        }
       }
       continue;
     }

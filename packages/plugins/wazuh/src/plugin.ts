@@ -1,3 +1,5 @@
+import type { DesktopCodePlugin } from "@bitsentry-ce/core/features/plugins";
+
 function readString(value, fallback = "") {
   if (typeof value === "string") {
     const normalized = value.trim();
@@ -9,7 +11,7 @@ function readString(value, fallback = "") {
   return fallback;
 }
 
-function readRecord(value) {
+function readRecord(value): Record<string, unknown> | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
   }
@@ -17,7 +19,7 @@ function readRecord(value) {
   return value;
 }
 
-function readRecordOrEmpty(value) {
+function readRecordOrEmpty(value): Record<string, unknown> {
   return readRecord(value) ?? {};
 }
 
@@ -37,7 +39,7 @@ function resolveWazuhErrorSourceSetup(context) {
   const indexUrl = readString(setupValues.indexUrl);
   const indexPassword = readString(setupValues.indexPassword);
   const indexPatterns = readStringArray(setupValues.indexPatterns);
-  const configuration = {};
+  const configuration: Record<string, unknown> = {};
   if (indexUrl.length > 0) {
     configuration.baseUrl = indexUrl;
   }
@@ -171,7 +173,7 @@ function buildWazuhTags(hit) {
   const agent = readWazuhAgentRecord(hit);
   const manager = readWazuhManagerRecord(hit);
   const decoder = readRecord(source?.decoder);
-  const tags = {};
+  const tags: Record<string, unknown> = {};
 
   const ruleId = readString(rule?.id);
   if (ruleId.length > 0) tags.ruleId = ruleId;
@@ -259,7 +261,7 @@ function buildQuery(input) {
     });
   }
 
-  const range = {};
+  const range: Record<string, string> = {};
   const since = readString(input.since);
   const until = readString(input.until);
   if (since.length > 0) {
@@ -427,7 +429,7 @@ async function queryIssues(context) {
   };
 }
 
-exports.plugin = {
+const plugin: DesktopCodePlugin = {
   id: "wazuh",
   name: "Wazuh",
   version: "0.1.0",
@@ -594,3 +596,6 @@ exports.plugin = {
   ],
   triggers: [],
 };
+
+export { plugin };
+export default plugin;

@@ -1,3 +1,5 @@
+import type { DesktopCodePlugin } from "@bitsentry-ce/core/features/plugins";
+
 const POSTHOG_DEFAULT_BASE_URL = "https://us.posthog.com";
 const DEFAULT_ISSUES_LIMIT = 50;
 const DEFAULT_EVENTS_LIMIT = 50;
@@ -38,7 +40,7 @@ function readStringArray(value) {
     .filter((item) => item.length > 0);
 }
 
-function readRecord(value) {
+function readRecord(value): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
@@ -55,7 +57,7 @@ function resolvePostHogErrorSourceSetup(context) {
     readString(setupValues.organizationId),
   );
   const projectIds = readStringArray(setupValues.projectIds);
-  const configuration = {};
+  const configuration: Record<string, unknown> = {};
   if (baseUrl.length > 0) {
     configuration.baseUrl = baseUrl;
   }
@@ -229,7 +231,12 @@ function normalizeTokenResponse(payload) {
     throw new Error("PostHog OAuth response did not include an access token");
   }
 
-  const response = { accessToken };
+  const response: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    scope?: string;
+  } = { accessToken };
   const refreshToken = readString(payload?.refresh_token);
   if (refreshToken.length > 0) {
     response.refreshToken = refreshToken;
@@ -746,7 +753,7 @@ function buildEventRecord(row) {
   const os = pickFirstString(row.os);
   const lib = pickFirstString(row.lib);
   const personId = pickFirstString(row.person_id);
-  const contexts = {};
+  const contexts: Record<string, unknown> = {};
   addNamedContext(contexts, "browser", browser);
   addNamedContext(contexts, "os", os);
   if (sessionId !== null) {
@@ -1153,7 +1160,7 @@ async function listIssueEvents({ auth, input }) {
   };
 }
 
-exports.plugin = {
+const plugin: DesktopCodePlugin = {
   id: "posthog",
   name: "PostHog",
   version: "0.1.0",
@@ -1518,3 +1525,6 @@ exports.plugin = {
   ],
   triggers: [],
 };
+
+export { plugin };
+export default plugin;

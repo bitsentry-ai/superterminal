@@ -637,6 +637,66 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/plugins/github:
+    devDependencies:
+      '@bitsentry-ce/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.8
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@25.3.0)(@vitest/coverage-v8@4.1.8)(jsdom@26.1.0)(vite@7.3.5(@types/node@25.3.0)(jiti@2.7.0)(yaml@2.9.0))
+
+  packages/plugins/posthog:
+    devDependencies:
+      '@bitsentry-ce/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.8
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@25.3.0)(@vitest/coverage-v8@4.1.8)(jsdom@26.1.0)(vite@7.3.5(@types/node@25.3.0)(jiti@2.7.0)(yaml@2.9.0))
+
+  packages/plugins/sentry:
+    devDependencies:
+      '@bitsentry-ce/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.8
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@25.3.0)(@vitest/coverage-v8@4.1.8)(jsdom@26.1.0)(vite@7.3.5(@types/node@25.3.0)(jiti@2.7.0)(yaml@2.9.0))
+
+  packages/plugins/wazuh:
+    devDependencies:
+      '@bitsentry-ce/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.8
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@25.3.0)(@vitest/coverage-v8@4.1.8)(jsdom@26.1.0)(vite@7.3.5(@types/node@25.3.0)(jiti@2.7.0)(yaml@2.9.0))
+
 packages:
 
   7zip-bin@5.2.0:
@@ -10690,7 +10750,7 @@ snapshots:
       js-yaml: 4.2.0
       json5: 2.2.3
       lazy-val: 1.0.5
-      minimatch: 10.2.4
+      minimatch: 10.2.5
       plist: 3.1.0
       proper-lockfile: 4.1.2
       resedit: 1.7.2
@@ -11767,7 +11827,7 @@ snapshots:
 
   filelist@1.0.5:
     dependencies:
-      minimatch: 10.2.4
+      minimatch: 10.2.5
 
   fill-range@7.1.1:
     dependencies:

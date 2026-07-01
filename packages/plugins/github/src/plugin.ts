@@ -1,8 +1,10 @@
+import type { DesktopCodePlugin } from "@bitsentry-ce/core/features/plugins";
+
 const GITHUB_API_BASE = "https://api.github.com";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
-function readRecord(value) {
+function readRecord(value): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
@@ -115,7 +117,7 @@ function parseGitHubErrorBody(raw) {
 async function requestGitHub(auth, pathname, params = {}) {
   const accessToken = readString(auth.accessToken ?? auth.authToken ?? auth.token);
   const apiBase = auth.apiBase ?? auth.baseUrl;
-  const headers = {
+  const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "User-Agent": "bitsentry-superterminal-plugin",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -318,9 +320,8 @@ async function queryGitHubIssues(context) {
       per_page: String(limit + 1),
       page: String(page),
     });
-    const items = Array.isArray(readRecord(result).items)
-      ? readRecord(result).items
-      : [];
+    const resultItems = readRecord(result).items;
+    const items: unknown[] = Array.isArray(resultItems) ? resultItems : [];
     for (const item of items.slice(0, limit)) {
       issues.push(normalizeGitHubIssue(owner, repo, item));
     }
@@ -402,7 +403,7 @@ function resolveGitHubErrorSourceSetup(context) {
   const owner = readString(setupValues.owner);
   const repos = readStringArray(setupValues.repos);
   const apiBase = readString(setupValues.apiBase);
-  const configuration = {};
+  const configuration: Record<string, unknown> = {};
 
   if (owner.length > 0) {
     configuration.orgSlug = owner;
@@ -451,7 +452,7 @@ function buildGitHubErrorSourceProbeAuth(context) {
   );
 }
 
-exports.plugin = {
+const plugin: DesktopCodePlugin = {
   id: "github",
   name: "GitHub",
   version: "0.1.0",
@@ -639,3 +640,6 @@ exports.plugin = {
   ],
   triggers: [],
 };
+
+export { plugin };
+export default plugin;

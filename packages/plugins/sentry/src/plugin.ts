@@ -1,3 +1,5 @@
+import type { DesktopCodePlugin } from "@bitsentry-ce/core/features/plugins";
+
 const SENTRY_API_BASE = "https://sentry.io/api/0";
 const SENTRY_AUTHORIZE_URL = "https://sentry.io/oauth/authorize/";
 const SENTRY_TOKEN_URL = "https://sentry.io/oauth/token/";
@@ -80,7 +82,7 @@ function parseJsonArray(payload) {
   );
 }
 
-function readRecord(value) {
+function readRecord(value): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
@@ -96,7 +98,7 @@ function resolveSentryErrorSourceSetup(context) {
     readString(setupValues.organizationSlug),
   );
   const projectSlugs = readStringArray(setupValues.projectSlugs);
-  const configuration = {};
+  const configuration: Record<string, unknown> = {};
   if (orgSlug.length > 0) {
     configuration.orgSlug = orgSlug;
   }
@@ -314,7 +316,12 @@ function normalizeTokenResponse(payload) {
     throw new Error("Sentry OAuth response did not include an access token");
   }
 
-  const response = { accessToken };
+  const response: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    scope?: string;
+  } = { accessToken };
   const refreshToken = readString(payload?.refresh_token);
   if (refreshToken.length > 0) {
     response.refreshToken = refreshToken;
@@ -543,7 +550,7 @@ async function listIssueEvents({ auth, input }) {
   };
 }
 
-exports.plugin = {
+const plugin: DesktopCodePlugin = {
   id: "sentry",
   name: "Sentry",
   version: "0.1.0",
@@ -880,3 +887,6 @@ exports.plugin = {
   ],
   triggers: [],
 };
+
+export { plugin };
+export default plugin;

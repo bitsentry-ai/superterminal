@@ -65,7 +65,10 @@ async function collectPluginEntryPaths(rootDirectory: string): Promise<string[]>
         continue;
       }
 
-      if (entry.isFile() && entry.name === "plugin.js") {
+      if (
+        entry.isFile() &&
+        (entry.name === "plugin.js" || nextPath.endsWith(`${path.sep}dist${path.sep}plugin.js`))
+      ) {
         matches.push(nextPath);
       }
     }
@@ -106,7 +109,7 @@ async function installPluginFromArchive(input: {
     const entryPath = entryPaths[0];
     if (entryPath === undefined) {
       throw new Error(
-        "Downloaded plugin archive does not contain a plugin.js code entrypoint.",
+        "Downloaded plugin archive does not contain a plugin.js or dist/plugin.js code entrypoint.",
       );
     }
 
